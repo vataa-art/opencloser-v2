@@ -72,6 +72,7 @@ pub fn run() {
             ai::gemini::objection_trainer_turn,
             ai::kb::kb_ingest_document,
             ai::kb::kb_search,
+            ai::copilot::copilot_turn,
             get_relay_port,
             get_relay_token,
             secrets::secret_set,

@@ -3,7 +3,7 @@
 // New Campaign quick-add and settings entry.
 // ============================================================
 
-import { Bot, Home, LayoutDashboard, Phone, Plus, Settings, Swords, Target, Zap } from "lucide-react";
+import { Bot, GraduationCap, Home, LayoutDashboard, Phone, Plus, Settings, Swords, Target, Zap, AudioLines } from "lucide-react";
 
 const SIDEBAR_TOP = [
   { icon: Home, state: "home", label: "Overview" },
@@ -13,6 +13,8 @@ const SIDEBAR_TOP = [
   { icon: Bot, state: "persona", label: "AI Caller" },
   { icon: Zap, state: "agy", label: "AGY Agents" },
   { icon: Swords, state: "trainer", label: "Sales Coach" },
+  { icon: GraduationCap, state: "recruitment", label: "Recruitment Academy" },
+  { icon: AudioLines, state: "copilot", label: "Live Copilot" },
 ];
 
 const SIDEBAR_BOTTOM = [

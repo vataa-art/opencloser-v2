@@ -23,6 +23,8 @@ const PostCallDebrief = React.lazy(() => import("../../voice/components/PostCall
 const AIPersonaBuilder = React.lazy(() => import("./AIPersonaBuilder").then(m => ({ default: m.AIPersonaBuilder })));
 const LeadDetailView = React.lazy(() => import("./LeadDetailView").then(m => ({ default: m.LeadDetailView })));
 const ObjectionTrainer = React.lazy(() => import("../../voice/components/ObjectionTrainer").then(m => ({ default: m.ObjectionTrainer })));
+const RecruitmentKnowledgeView = React.lazy(() => import("../../recruitment/components/RecruitmentKnowledgeView").then(m => ({ default: m.RecruitmentKnowledgeView })));
+const CopilotView = React.lazy(() => import("../../copilot/CopilotView").then(m => ({ default: m.CopilotView })));
 
 const LazyFallback = () => (
   <div className="flex items-center justify-center h-full" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 13 }}>
@@ -33,7 +35,7 @@ const LazyFallback = () => (
 type AppState =
   | "onboarding" | "icp_review" | "audio_setup" | "persona_setup"
   | "home" | "dashboard" | "hunter" | "call_logs" | "settings"
-  | "persona" | "agy" | "lead_detail" | "trainer" | "welcome";
+  | "persona" | "agy" | "lead_detail" | "trainer" | "recruitment" | "copilot" | "welcome";
 
 export function KanbanBoard() {
   const voiceKeys = useKeysStore((s) => s.keys);
@@ -341,6 +343,18 @@ export function KanbanBoard() {
           {appState === "trainer" && (
             <Suspense fallback={<LazyFallback />}>
             <ObjectionTrainer icp={icpData} />
+            </Suspense>
+          )}
+
+          {appState === "recruitment" && (
+            <Suspense fallback={<LazyFallback />}>
+            <RecruitmentKnowledgeView onBack={() => setAppState("home")} />
+            </Suspense>
+          )}
+
+          {appState === "copilot" && (
+            <Suspense fallback={<LazyFallback />}>
+            <CopilotView />
             </Suspense>
           )}
 

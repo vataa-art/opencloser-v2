@@ -12,7 +12,9 @@ export type AppPage =
   | "settings"
   | "persona"
   | "lead_detail"
-  | "trainer";
+  | "trainer"
+  | "recruitment"
+  | "copilot";
 
 interface NavigationState {
   currentPage: AppPage;

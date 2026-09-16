@@ -25,6 +25,8 @@ export const ROUTES = {
   PERSONA: "persona",
   LEAD_DETAIL: "lead_detail",
   TRAINER: "trainer",
+  RECRUITMENT: "recruitment",
+  COPILOT: "copilot",
 } as const;
 
 export const LEAD_STATUSES = ["Discovery", "Outbound Call", "Audit Requested", "Closed"] as const;
@@ -43,6 +45,8 @@ export const SIDEBAR_TOP = [
   { icon: "Target", state: "hunter", label: "Lead Researcher" },
   { icon: "Bot", state: "persona", label: "AI Caller" },
   { icon: "Swords", state: "trainer", label: "Sales Coach" },
+  { icon: "GraduationCap", state: "recruitment", label: "Recruitment Academy" },
+  { icon: "AudioLines", state: "copilot", label: "Live Copilot" },
 ] as const;
 
 export const SIDEBAR_BOTTOM = [
