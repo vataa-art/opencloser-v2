@@ -163,6 +163,14 @@ pub async fn kb_ingest_document(
         .unwrap_or_else(|| LOCAL_EMBEDDER_ID.to_string());
 
     let conn = open_db(&app)?;
+    // Re-ingest must be atomic per source: without this delete, a shorter
+    // document leaves stale higher-index chunks searchable (union-alpha
+    // iter-1 review finding).
+    conn.execute(
+        "DELETE FROM kb_chunks WHERE domain = ?1 AND source = ?2",
+        rusqlite::params![domain, source],
+    )
+    .map_err(|e| format!("Failed to clear old kb chunks: {}", e))?;
     for ((id, vec, embedder), chunk) in embedded.iter().zip(&chunks) {
         insert_chunk(&conn, id, &domain, &source, chunk, vec, embedder, &tags_json)?;
     }
