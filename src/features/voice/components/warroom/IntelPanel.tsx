@@ -7,12 +7,16 @@ import { memo } from "react";
 import { AlertTriangle, Brain, Lightbulb, Mic, MicOff, PhoneOff, Smartphone, TrendingUp, Zap } from "lucide-react";
 import type { EmotionAxes, EmotionShift } from "../../lib/emotion-engine";
 import type { ObjectionMatch } from "../../lib/objection-engine";
+import type { FlaggedClaim } from "../../lib/coach-agent";
 import { SENTIMENT_CONFIG, SENTIMENT_ORDER, type SentimentLevel } from "./warroom-logic";
 
 interface IntelPanelProps {
   sentiment: SentimentLevel;
   sentimentLabel: string;
   activeObjection: ObjectionMatch | null;
+  counterScript: string | null;
+  kbSources: string[];
+  flaggedClaims: FlaggedClaim[];
   onDismissObjection: () => void;
   coachingHints: string[];
   currentAxes: EmotionAxes | null;
@@ -28,7 +32,7 @@ interface IntelPanelProps {
 }
 
 export const IntelPanel = memo(function IntelPanel({
-  sentiment, sentimentLabel, activeObjection, onDismissObjection,
+  sentiment, sentimentLabel, activeObjection, counterScript, kbSources, flaggedClaims, onDismissObjection,
   coachingHints, currentAxes, recentShifts, aiTurns, prospectTurns, objectionCount,
   usePhoneLink, onTogglePhoneLink, isMuted, onToggleMute, onEndCall,
 }: IntelPanelProps) {
@@ -71,8 +75,18 @@ export const IntelPanel = memo(function IntelPanel({
             </span>
           </div>
           <p className="text-[11px] text-gray-400 mb-3 font-mono bg-black/30 rounded-xl p-3 leading-relaxed border border-white/[0.03]">
-            "{activeObjection.counterScript.substring(0, 140)}..."
+            {counterScript
+              ? `"${counterScript.substring(0, 140)}${counterScript.length > 140 ? "..." : ""}"`
+              : "CoachAgent is preparing a KB-grounded script..."}
           </p>
+          {kbSources.length > 0 && (
+            <p className="text-[9px] text-gray-600 font-mono mb-2">sources: {kbSources.join(", ")}</p>
+          )}
+          {flaggedClaims.length > 0 && (
+            <p className="text-[10px] text-red-400 font-mono mb-2 bg-red-500/10 border border-red-500/25 rounded-lg p-2">
+              ⚠ unverified statistic: {flaggedClaims.map((c) => c.raw).join(", ")}
+            </p>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-orange-400/60 font-mono font-bold">{activeObjection.framework}</span>
             <button onClick={onDismissObjection} className="text-[10px] text-gray-600 hover:text-gray-400 transition-colors btn-press">dismiss</button>

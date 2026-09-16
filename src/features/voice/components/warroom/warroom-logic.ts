@@ -60,7 +60,7 @@ export function getCallPhase(callState: string, transcriptLength: number): { lab
 export function buildCoachingHints(
   transcript: { role: "user" | "model"; text: string }[],
   elapsedSeconds: number,
-  framework: string
+  coachHints: string[] = []
 ): string[] {
   const hints: string[] = [];
   const n = transcript.length;
@@ -69,22 +69,9 @@ export function buildCoachingHints(
 
   if (n === 0) { hints.push("🎯 Opening: Build rapport fast. Mirror their energy."); return hints; }
 
-  if (n < 4) {
-    if (framework === "SPIN Selling") hints.push("📋 SPIN Situation: Ask about their current process. 'Walk me through how you currently handle X?'");
-    else if (framework === "Challenger Sale") hints.push("💡 Challenger: Lead with an insight. Teach them something they don't know about their industry.");
-    else if (framework === "Sandler System") hints.push("🤝 Sandler: Set an upfront contract. Agree on what happens at the end of this call.");
-    else hints.push("⚡ Straight Line: Build certainty in yourself. Be warm, bold, and confident from the first line.");
-  } else if (n < 8) {
-    if (framework === "SPIN Selling") hints.push("🔍 SPIN Problem: Probe for pain. 'What's the biggest challenge you have with X right now?'");
-    else if (framework === "Challenger Sale") hints.push("🎯 Challenger: Reframe. Connect your insight to their specific pain.");
-    else if (framework === "Sandler System") hints.push("💰 Sandler: Qualify budget. 'If we solved this, do you have budget set aside to move on this?'");
-    else hints.push("🚀 Straight Line: Build certainty in the product. Use vivid, outcome-focused language.");
-  } else if (n < 12) {
-    if (framework === "SPIN Selling") hints.push("📈 SPIN Implication: Amplify the pain. 'If this doesn't change, what does that mean for the business in 12 months?'");
-    else hints.push("🎁 Present the solution. Tie every feature back to the pain they told you about.");
-  } else {
-    hints.push("🏁 Close Time: Ask for the meeting. 'Does what we've covered make sense to take to the next step?'");
-  }
+  // Stage-by-stage threshold scripts are gone: KB-grounded coaching comes
+  // from the CoachAgent (debounced) — see coach-agent.ts in ../lib.
+  hints.push(...coachHints);
 
   if (aiMsgs > userMsgs * 2 && n > 3) hints.push("⚠️ AI is talking too much. Ask a question and actually listen.");
   if (elapsedSeconds > 300) hints.push("⏱️ 5+ min call. Pivot to the close. Don't let it drift.");

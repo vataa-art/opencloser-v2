@@ -2,6 +2,11 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::env;
+use tauri::AppHandle;
+
+use kb_core::gemini_tools::{
+    extract_text, extract_tool_call, kb_tool_declaration, push_function_round, MAX_TOOL_ROUNDS,
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LeadSimulation {
@@ -631,6 +636,7 @@ pub struct ObjectionTrainerRequest {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ObjectionTrainerResponse {
     pub role: String,
     pub text: String,
@@ -644,6 +650,7 @@ pub struct ObjectionTrainerResponse {
 #[tauri::command]
 pub async fn objection_trainer_turn(
     req: ObjectionTrainerRequest,
+    app: AppHandle,
 ) -> Result<ObjectionTrainerResponse, String> {
     let api_key_str = req.api_key.clone();
     let api_key = api_key_str
@@ -651,7 +658,10 @@ pub async fn objection_trainer_turn(
         .or_else(|| env::var("GEMINI_API_KEY").ok())
         .unwrap_or_default();
     if api_key.is_empty() || api_key == "MY_GEMINI_API_KEY" {
-        return Ok(get_mock_trainer_response(&req));
+        // Offline path: ground the mock coach with whatever the local KB
+        // has for this objection (no key → local embedder).
+        let kb_hits = super::kb::tool_search(&app, &req.objection, &None).await;
+        return Ok(get_mock_trainer_response(&req, Some(&kb_hits)));
     }
 
     let messages_text: Vec<String> = req
@@ -667,60 +677,85 @@ pub async fn objection_trainer_turn(
         .collect();
 
     let prompt = format!(
-        "You are role-playing as a resistant B2B prospect in a sales objection training simulation.
+        "You are role-playing as a resistant B2B prospect in a sales objection training simulation. \
         Objection: \"{}\". Difficulty: {}.
         Conversation: {}
         Respond as the prospect. Keep responses 1-3 sentences. Be realistic.
+        Before quoting ANY statistic, percentage, or factual claim, call \
+        search_knowledge_base to verify it against verified training material; \
+        only cite numbers that appear in the results.
         Return JSON: role='ai_prospect', text=<your next line>, isComplete=false (unless score requested).",
         req.objection, req.difficulty, messages_text.join("\n")
     );
 
     let client = Client::new();
     let url = format!("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}", api_key);
-    let payload = json!({
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "responseMimeType": "application/json",
-            "responseSchema": {
-                "type": "OBJECT",
-                "properties": {
-                    "role": { "type": "STRING" },
-                    "text": { "type": "STRING" },
-                    "isComplete": { "type": "BOOLEAN" },
-                    "score": { "type": "INTEGER" },
-                    "strengths": { "type": "ARRAY", "items": { "type": "STRING" } },
-                    "improvements": { "type": "ARRAY", "items": { "type": "STRING" } },
-                    "rebuttalTip": { "type": "STRING" }
-                },
-                "required": ["role","text","isComplete"]
-            }
-        }
-    });
 
-    let res = client
-        .post(&url)
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| format!("HTTP request failed: {}", e))?;
-    if !res.status().is_success() {
-        let err_text = res.text().await.unwrap_or_default();
-        return Err(format!("Gemini API error: {}", err_text));
-    }
-    let body: Value = res
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response JSON: {}", e))?;
-    let text = body["candidates"][0]["content"]["parts"][0]["text"]
-        .as_str()
-        .unwrap_or("{}");
-    let result: ObjectionTrainerResponse =
-        serde_json::from_str(text).map_err(|e| format!("Failed to parse: {}", e))?;
+    let mut contents = vec![json!({ "role": "user", "parts": [{ "text": prompt }] })];
+    let mut tool_rounds = 0usize;
+
+    let final_text = loop {
+        let payload = json!({
+            "contents": contents,
+            "tools": [kb_tool_declaration()]
+        });
+        let res = client
+            .post(&url)
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| format!("HTTP request failed: {}", e))?;
+        if !res.status().is_success() {
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!("Gemini API error: {}", err_text));
+        }
+        let body: Value = res
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse response JSON: {}", e))?;
+
+        if let Some((_name, query)) = extract_tool_call(&body) {
+            if tool_rounds >= MAX_TOOL_ROUNDS {
+                return Err("Model exceeded knowledge-base tool round limit".into());
+            }
+            let tool_result = super::kb::tool_search(&app, &query, &Some(api_key.clone())).await;
+            push_function_round(&mut contents, &body, tool_result);
+            tool_rounds += 1;
+            continue;
+        }
+        break extract_text(&body).unwrap_or_else(|| "{}".to_string());
+    };
+
+    let result: ObjectionTrainerResponse = parse_lenient_json(&final_text)
+        .map_err(|e| format!("Failed to parse: {}", e))?;
     Ok(result)
 }
 
-fn get_mock_trainer_response(req: &ObjectionTrainerRequest) -> ObjectionTrainerResponse {
+/// Parse a JSON object out of a model response that may wrap it in prose
+/// or code fences (used when responseSchema is not available because the
+/// tools array is active).
+fn parse_lenient_json(text: &str) -> Result<ObjectionTrainerResponse, String> {
+    let trimmed = text.trim();
+    let candidate = match (trimmed.find('{'), trimmed.rfind('}')) {
+        (Some(start), Some(end)) if end > start => &trimmed[start..=end],
+        _ => trimmed,
+    };
+    serde_json::from_str(candidate).map_err(|e| e.to_string())
+}
+
+fn get_mock_trainer_response(req: &ObjectionTrainerRequest, kb_hits: Option<&Value>) -> ObjectionTrainerResponse {
     let msg_count = req.messages.len();
+    // Offline grounding: cite the top KB chunk in the rebuttal tip so the
+    // coach is never "making things up" even without an API key.
+    let kb_note: Option<String> = kb_hits.and_then(|hits| {
+        let source = hits["results"][0]["source"].as_str()?;
+        let text = hits["results"][0]["text"].as_str()?;
+        Some(format!(
+            " [KB: {} — {}]",
+            source,
+            text.chars().take(120).collect::<String>()
+        ))
+    });
 
     if req.mode == "score" || msg_count >= 5 {
         let score: i32 = match req.difficulty.as_str() {
@@ -743,11 +778,17 @@ fn get_mock_trainer_response(req: &ObjectionTrainerRequest) -> ObjectionTrainerR
                 "Ask more discovery questions before jumping to the solution".into(),
                 "Use the Feel-Felt-Found framework more explicitly: 'I understand how you feel...'".into(),
             ],
-            rebuttal_tip: match req.objection.as_str().contains("expensive") || req.objection.as_str().contains("budget") {
-                true => "Try the ROI reframe: 'What would it cost you if this problem goes unsolved for another 6 months?'".into(),
-                false => match req.objection.as_str().contains("already") || req.objection.as_str().contains("broker") {
-                    true => "Try: 'That's exactly why you should hear us out — the best clients do their homework. What specifically would you need to see to consider a switch?'".into(),
-                    false => "Try the 'feel-felt-found' technique: 'I understand how you feel. Others have felt the same way. What they found was...'".into(),
+            rebuttal_tip: {
+                let tip = match req.objection.as_str().contains("expensive") || req.objection.as_str().contains("budget") {
+                    true => "Try the ROI reframe: 'What would it cost you if this problem goes unsolved for another 6 months?'".to_string(),
+                    false => match req.objection.as_str().contains("already") || req.objection.as_str().contains("broker") {
+                        true => "Try: 'That's exactly why you should hear us out — the best clients do their homework. What specifically would you need to see to consider a switch?'".to_string(),
+                        false => "Try the 'feel-felt-found' technique: 'I understand how you feel. Others have felt the same way. What they found was...'".to_string(),
+                    }
+                };
+                match &kb_note {
+                    Some(note) => format!("{}{}", tip, note),
+                    None => tip,
                 }
             },
         };

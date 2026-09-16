@@ -9,6 +9,7 @@ import type { AIPersona } from "../../../types/persona";
 import { createCallerEngine, CallerEngine, CallState, TranscriptLine } from "../lib/caller-engine";
 import { analyzeEmotions, EmotionAxes, EmotionShift } from "../lib/emotion-engine";
 import { detectObjectionInTranscript, ObjectionMatch } from "../lib/objection-engine";
+import { coachAdvise, createDebouncedCoach, type CoachAdvice } from "../lib/coach-agent";
 import { DeepgramTranscriber, normalizeDeepgramLanguage } from "../lib/deepgram";
 import { getProviderKey, hasAnyProviderKey, useKeysStore } from "../../../stores/keys.store";
 import { assertLeadCallable } from "../../../services/lead.service";
@@ -59,6 +60,7 @@ export function WarRoom({ lead, icp, onClose }: WarRoomProps) {
   // Objection coaching
   const [activeObjection, setActiveObjection] = useState<ObjectionMatch | null>(null);
   const [objectionHistory, setObjectionHistory] = useState<ObjectionMatch[]>([]);
+  const [coachAdvice, setCoachAdvice] = useState<CoachAdvice | null>(null);
 
   // Audio
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -458,9 +460,22 @@ export function WarRoom({ lead, icp, onClose }: WarRoomProps) {
   const isCallLive = callState === "active" || callState === "objection_mode" || callState === "closing";
   const phase = getCallPhase(callState, transcript.length);
   const hasExceededFiveMinutes = elapsedSeconds > 300;
+  // CoachAgent: KB-grounded counter-scripts + hints, debounced so live
+  // transcript updates never spam the embedding API.
+  const debouncedCoach = useMemo(
+    () =>
+      createDebouncedCoach(4000, async (objection: ObjectionMatch | null, lines: TranscriptLine[]) =>
+        setCoachAdvice(await coachAdvise({ objection, transcript: lines }))
+      ),
+    [],
+  );
+  useEffect(() => {
+    debouncedCoach.schedule(activeObjection, transcript);
+  }, [debouncedCoach, activeObjection, transcript.length]);
+  useEffect(() => () => debouncedCoach.cancel(), [debouncedCoach]);
   const coachingHints = useMemo(
-    () => buildCoachingHints(transcript, hasExceededFiveMinutes ? 301 : 0, persona.framework),
-    [transcript, hasExceededFiveMinutes, persona.framework],
+    () => buildCoachingHints(transcript, hasExceededFiveMinutes ? 301 : 0, coachAdvice?.hints ?? []),
+    [transcript, hasExceededFiveMinutes, coachAdvice],
   );
   const { aiTurns, prospectTurns } = useMemo(() => ({
     aiTurns: transcript.filter((t) => t.role === "model").length,
@@ -555,6 +570,9 @@ export function WarRoom({ lead, icp, onClose }: WarRoomProps) {
             sentiment={sentiment}
             sentimentLabel={sentimentLabel}
             activeObjection={activeObjection}
+            counterScript={coachAdvice?.counterScript ?? null}
+            kbSources={coachAdvice?.sources ?? []}
+            flaggedClaims={coachAdvice?.flaggedClaims ?? []}
             onDismissObjection={dismissObjection}
             coachingHints={coachingHints}
             currentAxes={currentAxes}

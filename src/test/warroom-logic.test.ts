@@ -53,16 +53,24 @@ describe("war room logic", () => {
     expect(getCallPhase("active", 20).label).toContain("Close");
   });
 
-  it("scales coaching hints with the conversation stage", () => {
-    const empty = buildCoachingHints([], 10, "SPIN Selling");
+  it("uses CoachAgent hints instead of stage thresholds", () => {
+    const empty = buildCoachingHints([], 10);
     expect(empty[0]).toContain("Opening");
 
-    const closing = buildCoachingHints(
+    // Stage thresholds are gone — mid-call transcript yields no local
+    // hints beyond CoachAgent-provided ones.
+    const midCall = buildCoachingHints(
       [...Array(12)].map((_, i) => ({ role: "user" as const, text: `line ${i}` })),
-      30,
-      "Straight Line"
+      30
     );
-    expect(closing.some((h) => h.includes("Close Time"))).toBe(true);
+    expect(midCall).toHaveLength(0);
+
+    const withCoach = buildCoachingHints(
+      [...Array(8)].map((_, i) => ({ role: "user" as const, text: `line ${i}` })),
+      30,
+      ["📚 KB-grounded hint from CoachAgent [KB: vHG4m5ptmJs]"]
+    );
+    expect(withCoach.some((h) => h.includes("CoachAgent"))).toBe(true);
 
     const overTalk = buildCoachingHints(
       [
@@ -71,8 +79,7 @@ describe("war room logic", () => {
         { role: "user", text: "c" },
         { role: "model", text: "d" },
       ],
-      400,
-      "SPIN Selling"
+      400
     );
     expect(overTalk.some((h) => h.includes("talking too much"))).toBe(true);
     expect(overTalk.some((h) => h.includes("5+ min"))).toBe(true);
