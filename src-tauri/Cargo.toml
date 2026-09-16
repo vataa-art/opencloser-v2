@@ -8,6 +8,9 @@ repository = ""
 edition = "2021"
 rust-version = "1.77.2"
 
+[workspace]
+members = ["crates/kb-core"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
@@ -34,3 +37,4 @@ futures-util = "0.3"
 uuid = { version = "1", features = ["v4"] }
 base64 = "0.22"
 keyring = "3"
+kb-core = { path = "crates/kb-core" }

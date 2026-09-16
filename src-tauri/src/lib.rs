@@ -70,6 +70,8 @@ pub fn run() {
             ai::gemini::process_onboarding_chat,
             ai::gemini::analyze_call_transcript,
             ai::gemini::objection_trainer_turn,
+            ai::kb::kb_ingest_document,
+            ai::kb::kb_search,
             get_relay_port,
             get_relay_token,
             secrets::secret_set,

@@ -5,7 +5,7 @@ use tauri::{AppHandle, Manager};
 
 /// Latest schema version. Bump this and add a migration step below for
 /// every schema change; `PRAGMA user_version` tracks what has been applied.
-const SCHEMA_VERSION: i64 = 6;
+const SCHEMA_VERSION: i64 = 7;
 
 pub fn init(app_handle: &AppHandle) {
     let app_dir = app_handle
@@ -46,6 +46,9 @@ pub fn init(app_handle: &AppHandle) {
     } else {
         info!("Database already seeded with {} leads.", count);
     }
+
+    // Knowledge base: seed recruitment transcripts on first launch.
+    crate::ai::kb::seed_if_empty(&conn);
 }
 
 const BASE_SCHEMA: &str = "
@@ -109,6 +112,20 @@ const BASE_SCHEMA: &str = "
         duration INTEGER DEFAULT 0,
         FOREIGN KEY(lead_id) REFERENCES leads(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS kb_chunks (
+        id TEXT PRIMARY KEY,
+        domain TEXT NOT NULL,
+        source TEXT NOT NULL,
+        text TEXT NOT NULL,
+        embedding BLOB NOT NULL,
+        dim INTEGER NOT NULL,
+        embedder TEXT NOT NULL DEFAULT 'local-hash-256',
+        tags TEXT NOT NULL DEFAULT '[]',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_kb_chunks_domain ON kb_chunks(domain, embedder);
 ";
 
 fn user_version(conn: &Connection) -> i64 {
@@ -216,6 +233,28 @@ fn run_migrations(conn: &Connection) {
         safe_alter("ALTER TABLE leads ADD COLUMN consent_at TEXT DEFAULT NULL");
         safe_alter("ALTER TABLE leads ADD COLUMN opted_out_at TEXT DEFAULT NULL");
         set_user_version(conn, 6);
+    }
+
+    // v6 → v7: knowledge base chunks for vector search.
+    if version < 7 {
+        if let Err(e) = conn.execute(
+            "CREATE TABLE IF NOT EXISTS kb_chunks (
+                id TEXT PRIMARY KEY,
+                domain TEXT NOT NULL,
+                source TEXT NOT NULL,
+                text TEXT NOT NULL,
+                embedding BLOB NOT NULL,
+                dim INTEGER NOT NULL,
+                embedder TEXT NOT NULL DEFAULT 'local-hash-256',
+                tags TEXT NOT NULL DEFAULT '[]',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )",
+            [],
+        ) {
+            log::error!("Failed to create kb_chunks: {}", e);
+        }
+        safe_alter("CREATE INDEX IF NOT EXISTS idx_kb_chunks_domain ON kb_chunks(domain, embedder)");
+        set_user_version(conn, 7);
     }
 
     info!(

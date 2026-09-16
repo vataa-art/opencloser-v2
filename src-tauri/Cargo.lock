@@ -100,6 +100,7 @@ dependencies = [
  "base64 0.22.1",
  "dotenvy",
  "futures-util",
+ "kb-core",
  "keyring",
  "log",
  "reqwest 0.12.28",
@@ -2035,6 +2036,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5dea2b27dd239b2556ed7a25ba842fe47fd602e7fc7433c2a8d6106d4d9edd70"
 dependencies = [
  "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "kb-core"
+version = "0.1.0"
+dependencies = [
  "serde_json",
 ]
 
