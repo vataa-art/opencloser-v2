@@ -213,6 +213,34 @@ npm run tauri dev
 
 ---
 
+## 🧠 Knowledge Base & Live Copilot
+
+OpenCloser ships with a local vector knowledge base (SQLite + offline hashed
+embeddings; Gemini `text-embedding-004` is used automatically when an API key
+is configured).
+
+- **Seeding:** on first launch the app ingests `knowledge/recruitment/` —
+  course transcripts (`transcripts/*.txt`) and the course catalog
+  (`courses.json`) — into the `kb_chunks` table (schema v7, `domain="recruitment"`).
+  Seeding is idempotent per source: drop new `.txt` transcripts or extend
+  `courses.json` and they are picked up on the next launch.
+- **Commands (Tauri):**
+  | Command | Purpose |
+  |---|---|
+  | `kb_ingest_document` | Clean → chunk → embed → store a document |
+  | `kb_search` | Top-k semantic search with scores + sources |
+  | `copilot_turn` | One live-assist turn: prospect question → KB-grounded suggestion |
+- **Live Copilot (sidebar → Live Copilot):** pick the lead you are calling
+  (sessions are blocked for DNC / non-consented leads), switch between
+  **Sales** and **Recruitment** domains, and get KB-grounded answers with
+  source attribution. Mic capture reuses the Deepgram relay; typed questions
+  and screening presets work without any microphone.
+- **Agentic reasoning:** the objection trainer can call
+  `search_knowledge_base` (function-calling round-trip) and the CoachAgent
+  flags fabricated statistics that are not backed by knowledge-base sources.
+
+---
+
 ## 📄 License
 
 MIT License — see [LICENSE](LICENSE) for details.

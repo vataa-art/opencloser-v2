@@ -85,6 +85,24 @@ opencloser/
 | `npm run tauri dev` | Start Tauri desktop app |
 | `npm run tauri build` | Build desktop binaries |
 
+Rust gates (windows-gnu toolchain on this machine — MSVC is not installed):
+
+```bash
+export CARGO_HOME=/g/tools/cargo RUSTUP_HOME=/g/tools/rustup
+export PATH="/g/tools/cargo/bin:/g/tools/mingw64/mingw64/bin:$PATH"
+cargo +stable-x86_64-pc-windows-gnu check            # from src-tauri/
+cargo +stable-x86_64-pc-windows-gnu test -p kb-core  # pure-KB unit + acceptance tests
+```
+
+Note: debug `cargo test`/`build` of the app crate links `app_lib.dll` (cdylib)
+which exceeds the 65 535 PE export-ordinal limit on windows-gnu — Rust unit
+tests therefore live in the dependency-free `src-tauri/crates/kb-core` crate.
+
+Knowledge Base: schema v7 adds `kb_chunks`; seeding ingests
+`knowledge/recruitment/` (transcripts + courses.json) idempotently per source.
+Tauri commands: `kb_ingest_document`, `kb_search`, `copilot_turn` (see
+`src/services/kb.service.ts` and `src/features/copilot/`).
+
 ## Conventions
 
 ### TypeScript

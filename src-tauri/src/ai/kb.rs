@@ -7,7 +7,7 @@ use kb_core::{
 use reqwest::Client;
 use rusqlite::Connection;
 use serde::Serialize;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::env;
 use tauri::{AppHandle, Manager};
 
@@ -280,23 +280,75 @@ pub async fn kb_search(
     })
 }
 
-/// Startup seeding: ingest `knowledge/recruitment/transcripts/*.txt` as
-/// `domain="recruitment"` on first launch only. Best-effort — a missing or
-/// unreadable seed dir is logged, never fatal.
-pub fn seed_if_empty(conn: &Connection) -> usize {
-    let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM kb_chunks", [], |row| row.get(0))
+/// Ingest one document unless its `(domain, source)` chunks already exist.
+/// Idempotent: re-seeding skips known sources, so new documents (e.g. a
+/// newly added course) are picked up on the next launch.
+fn seed_document(
+    conn: &Connection,
+    domain: &str,
+    source: &str,
+    text: &str,
+    tags_json: &str,
+) -> usize {
+    let existing: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM kb_chunks WHERE domain = ?1 AND source = ?2",
+            rusqlite::params![domain, source],
+            |row| row.get(0),
+        )
         .unwrap_or(0);
-    if count > 0 {
-        log::info!("Knowledge base already has {} chunks; skipping seed.", count);
+    if existing > 0 {
         return 0;
     }
+    let chunks = chunk_text(&strip_vtt(text), kb_core::DEFAULT_CHUNK_CHARS, kb_core::DEFAULT_CHUNK_OVERLAP);
+    let mut inserted = 0usize;
+    for (idx, chunk) in chunks.iter().enumerate() {
+        let vec = embed_local(chunk);
+        let id = format!("{}:{}:{}", domain, source, idx);
+        if insert_chunk(conn, &id, domain, source, chunk, &vec, LOCAL_EMBEDDER_ID, tags_json).is_ok() {
+            inserted += 1;
+        }
+    }
+    inserted
+}
+
+/// Flatten one courses.json entry into an ingestible text block.
+fn course_block(course: &Value) -> Option<(String, String)> {
+    let id = course["id"].as_str()?.to_string();
+    let title = course["title"].as_str().unwrap_or("Untitled course");
+    let publisher = course["publisher"].as_str().unwrap_or("unknown");
+    let topics = course["topics"]
+        .as_array()
+        .map(|t| t.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", "))
+        .unwrap_or_default();
+    let coverage = course["coverage"]
+        .as_array()
+        .map(|t| t.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", "))
+        .unwrap_or_default();
+    let url = course["url"].as_str().unwrap_or("");
+    let lessons = course["lessons"]
+        .as_i64()
+        .map(|n| format!("{} lessons", n))
+        .unwrap_or_default();
+    let block = format!(
+        "Recruitment training course: {}. Publisher: {}. Topics: {}. Coverage: {}. {} URL: {}",
+        title, publisher, topics, coverage, lessons, url
+    );
+    Some((id, block))
+}
+
+/// Startup seeding: ingest `knowledge/recruitment/` into the KB —
+/// transcripts as one source per video plus flattened course catalog
+/// entries. Best-effort: failures are logged, never fatal.
+pub fn seed_if_empty(conn: &Connection) -> usize {
     let Some(dir) = seed_dir() else {
         log::info!("No KB seed directory found; starting with an empty knowledge base.");
         return 0;
     };
 
     let mut ingested = 0usize;
+
+    // 1. Transcripts: knowledge/recruitment/transcripts/*.txt
     let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
         .map(|rd| {
             rd.filter_map(|e| e.ok())
@@ -306,7 +358,6 @@ pub fn seed_if_empty(conn: &Connection) -> usize {
         })
         .unwrap_or_default();
     paths.sort();
-
     for path in paths {
         let source = match path.file_stem().and_then(|s| s.to_str()) {
             Some(stem) => stem.trim_end_matches(".en").to_string(),
@@ -319,15 +370,27 @@ pub fn seed_if_empty(conn: &Connection) -> usize {
                 continue;
             }
         };
-        let chunks = chunk_text(&strip_vtt(&raw), kb_core::DEFAULT_CHUNK_CHARS, kb_core::DEFAULT_CHUNK_OVERLAP);
-        for (idx, chunk) in chunks.iter().enumerate() {
-            let vec = embed_local(chunk);
-            let id = format!("recruitment:{}:{}", source, idx);
-            if insert_chunk(conn, &id, "recruitment", &source, chunk, &vec, LOCAL_EMBEDDER_ID, "[]").is_ok() {
-                ingested += 1;
+        ingested += seed_document(conn, "recruitment", &source, &raw, "[]");
+    }
+
+    // 2. Course catalog: knowledge/recruitment/courses.json
+    if let Some(courses_path) = dir
+        .parent()
+        .map(|p| p.join("courses.json"))
+        .filter(|p| p.is_file())
+    {
+        match std::fs::read_to_string(&courses_path).map_err(|e| e.to_string()).and_then(|s| serde_json::from_str::<Value>(&s).map_err(|e| e.to_string())) {
+            Ok(catalog) => {
+                for course in catalog["courses"].as_array().map(|a| a.as_slice()).unwrap_or(&[]) {
+                    if let Some((id, text)) = course_block(course) {
+                        ingested += seed_document(conn, "recruitment", &id, &text, &serde_json::json!(["course"]).to_string());
+                    }
+                }
             }
+            Err(e) => log::warn!("KB seed: cannot parse courses.json: {}", e),
         }
     }
-    log::info!("Knowledge base seeded with {} chunks from {}.", ingested, dir.display());
+
+    log::info!("Knowledge base seed pass complete: {} new chunks ({}).", ingested, dir.display());
     ingested
 }
