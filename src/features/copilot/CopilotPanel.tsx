@@ -47,6 +47,8 @@ interface CopilotPanelProps {
   onDomainChange: (domain: CopilotDomain) => void;
   listening: boolean;
   sessionActive: boolean;
+  /** Readiness gate not passed — session runs in shadow (no live calls). */
+  shadow?: boolean;
   onToggleSession: () => void;
   question: string;
   suggestion: string | null;
@@ -62,7 +64,7 @@ interface CopilotPanelProps {
 }
 
 export const CopilotPanel = memo(function CopilotPanel({
-  domain, onDomainChange, listening, sessionActive, onToggleSession,
+  domain, onDomainChange, listening, sessionActive, shadow, onToggleSession,
   question, suggestion, sources, busy, onManualQuestion, error, onEndSession,
   flow, onToggleBlocker, onAdvanceStage, objection,
 }: CopilotPanelProps) {
@@ -124,6 +126,13 @@ export const CopilotPanel = memo(function CopilotPanel({
           <p className="mt-2 text-[11px] font-mono text-red-400 bg-red-500/10 border border-red-500/25 rounded-lg p-2">{error}</p>
         )}
       </div>
+
+      {/* Shadow mode badge (readiness gate not passed) */}
+      {shadow && sessionActive && (
+        <p className="text-[11px] font-mono font-bold text-orange-400 bg-orange-500/10 border border-orange-500/25 rounded-xl px-4 py-2.5">
+          🟠 SHADOW MODE — живі дзвінки заблоковані до проходження readiness gate
+        </p>
+      )}
 
       {/* Presets */}
       <div className="bg-[#0a0a0a] border border-white/[0.08] rounded-2xl p-4">

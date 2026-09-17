@@ -11,6 +11,7 @@ import {
   stageBlockersSatisfied,
   toggleQuestion,
 } from "../features/copilot/screening-flow";
+import { RECRUITMENT_ARCHETYPES } from "../configs/objection-archetypes-recruitment";
 
 describe("screening flow — stage gating", () => {
   it("has 8 stages in the managed order", () => {
@@ -147,5 +148,45 @@ describe("recruitment objection archetypes", () => {
 
   it("returns null for neutral text", () => {
     expect(detectRecruitmentObjection("Доброго дня, я залишив заявку")).toBeNull();
+  });
+});
+
+describe("12 recruitment archetypes", () => {
+  it("has 12 archetypes covering the full recruitment objection map", () => {
+    expect(RECRUITMENT_ARCHETYPES).toHaveLength(12);
+    const ids = RECRUITMENT_ARCHETYPES.map((a) => a.id);
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        "expensive",
+        "no_time",
+        "job_guarantee",
+        "let_me_think",
+        "consult_family",
+        "tried_failed",
+        "competitor",
+        "self_study",
+        "too_old_no_base",
+        "send_email",
+        "wrong_moment",
+        "distrust_online",
+      ])
+    );
+    expect(new Set(ids).size).toBe(12);
+  });
+
+  it("detects «Пораджуся з дружиною»", () => {
+    expect(detectRecruitmentObjection("Я пораджуся з дружиною")?.id).toBe("consult_family");
+  });
+
+  it("detects «Я вже пробував, не вийшло»", () => {
+    expect(detectRecruitmentObjection("Я вже пробував, не вийшло")?.id).toBe("tried_failed");
+  });
+
+  it("detects «Не довіряю онлайн-школам»", () => {
+    expect(detectRecruitmentObjection("Не довіряю я онлайн-школам")?.id).toBe("distrust_online");
+  });
+
+  it("detects «Надішліть матеріали на пошту»", () => {
+    expect(detectRecruitmentObjection("Надішліть матеріали на пошту")?.id).toBe("send_email");
   });
 });

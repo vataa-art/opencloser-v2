@@ -10,6 +10,15 @@ import { SCREENING_FLOW } from "../configs/screening-flow";
 import { SCORECARD_BANDS, SCORECARD_CRITERIA } from "../configs/candidate-scorecard";
 import { RECRUITMENT_ARCHETYPES } from "../configs/objection-archetypes-recruitment";
 import { PRECALL_CHEATSHEET_FACTS } from "../configs/precall-cheatsheet";
+import {
+  READINESS_REQUIREMENTS,
+  READINESS_ON_FAIL,
+} from "../configs/readiness-gate";
+import {
+  PERSONAL_METRICS,
+  MANAGER_METRICS,
+  WEEKLY_SUMMARY_NOTE,
+} from "../configs/progress-metrics";
 
 // Canonical in-repo location (what GitHub gets).
 const repoKnowledge = resolve(__dirname, "../../knowledge/recruitment");
@@ -49,6 +58,26 @@ describe("configs parity with knowledge/recruitment/", () => {
     const canonical = readJson(repoKnowledge, "precall-cheatsheet.json") as { facts: unknown };
     expect(PRECALL_CHEATSHEET_FACTS).toEqual(canonical.facts);
   });
+
+  it("readiness requirements match readiness-gate.json", () => {
+    const canonical = readJson(repoKnowledge, "readiness-gate.json") as {
+      requirements: unknown;
+      on_fail: string;
+    };
+    expect(READINESS_REQUIREMENTS).toEqual(canonical.requirements);
+    expect(READINESS_ON_FAIL).toBe(canonical.on_fail);
+  });
+
+  it("metric definitions match progress-metrics.json", () => {
+    const canonical = readJson(repoKnowledge, "progress-metrics.json") as {
+      personal: unknown;
+      manager: unknown;
+      weekly_summary: string;
+    };
+    expect(PERSONAL_METRICS).toEqual(canonical.personal);
+    expect(MANAGER_METRICS).toEqual(canonical.manager);
+    expect(WEEKLY_SUMMARY_NOTE).toBe(canonical.weekly_summary);
+  });
 });
 
 // The pack-root content pack is a local (non-git) drop location. When it
@@ -60,6 +89,9 @@ describe.skipIf(!existsSync(packKnowledge))("pack-root content pack parity", () 
       "candidate-scorecard.json",
       "objection-archetypes-recruitment.json",
       "precall-cheatsheet.json",
+      "readiness-gate.json",
+      "progress-metrics.json",
+      "courses.json",
     ]) {
       expect(readJson(repoKnowledge, name)).toEqual(readJson(packKnowledge, name));
     }

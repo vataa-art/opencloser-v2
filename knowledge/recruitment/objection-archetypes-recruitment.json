@@ -1,13 +1,20 @@
 {
   "id": "objection-archetypes-recruitment",
-  "version": 1,
+  "version": 2,
   "updated_at": "2026-09-17",
   "note": "Recruitment-архетипи заперечень — заміна 12 продажних архетипів для домену Recruitment.",
   "archetypes": [
     {
       "id": "expensive",
       "label": "«Дорого»",
-      "triggers": ["дорого", "не по бюджету", "дорогий", "ціна", "дорого коштує", "дорожче"],
+      "triggers": [
+        "дорого",
+        "не по бюджету",
+        "дорогий",
+        "ціна",
+        "дорого коштує",
+        "дорожче"
+      ],
       "core_response": "Розкласти на вартість місяця / порівняти з ціною бездіяльності",
       "framework": "Monthly Cost Reframe",
       "urgency": "high"
@@ -15,7 +22,13 @@
     {
       "id": "no_time",
       "label": "«Немає часу»",
-      "triggers": ["немає часу", "не маю часу", "зайнятий", "завантажений", "ніколи не встигаю"],
+      "triggers": [
+        "немає часу",
+        "не маю часу",
+        "зайнятий",
+        "завантажений",
+        "ніколи не встигаю"
+      ],
       "core_response": "Реальний тайм-бокс + приклад графіка студента, який працював",
       "framework": "Realistic Time-box + Student Schedule Proof",
       "urgency": "high"
@@ -23,7 +36,12 @@
     {
       "id": "job_guarantee",
       "label": "«Чи гарантуєте роботу?»",
-      "triggers": ["гарантує", "гарантія", "гарантуєте роботу", "буде робота"],
+      "triggers": [
+        "гарантує",
+        "гарантія",
+        "гарантуєте роботу",
+        "буде робота"
+      ],
       "core_response": "Ніяких гарантій. Тільки факти з KB + що саме дає школа",
       "framework": "Honest Facts + School Value",
       "urgency": "medium"
@@ -31,10 +49,126 @@
     {
       "id": "let_me_think",
       "label": "«Подумаю»",
-      "triggers": ["подумаю", "мені треба подумати", "я подумаю"],
+      "triggers": [
+        "подумаю",
+        "мені треба подумати",
+        "я подумаю"
+      ],
       "core_response": "Прояснити, що саме незрозуміло; домовитись про дату",
       "framework": "Clarify + Date Commit",
       "urgency": "medium"
+    },
+    {
+      "id": "consult_family",
+      "label": "«Пораджуся з дружиною/батьками»",
+      "triggers": [
+        "пораджуся",
+        "дружиною",
+        "чоловіком",
+        "батьками",
+        "сім'єю",
+        "другою половинкою"
+      ],
+      "core_response": "Запропонувати спільний дзвінок + матеріали для другої сторони",
+      "framework": "Joint Call + Partner Materials",
+      "urgency": "medium"
+    },
+    {
+      "id": "tried_failed",
+      "label": "«Я вже пробував, не вийшло»",
+      "triggers": [
+        "вже пробував",
+        "не вийшло",
+        "кидав навчання",
+        "пробував навчатися"
+      ],
+      "core_response": "З'ясувати причину зриву; показати механіку супроводу",
+      "framework": "Root Cause + Support Mechanics",
+      "urgency": "high"
+    },
+    {
+      "id": "competitor",
+      "label": "«У конкурента дешевше/краще»",
+      "triggers": [
+        "у конкурента",
+        "конкурент",
+        "дешевше",
+        "інша школа",
+        "краще у інших"
+      ],
+      "core_response": "Не критикувати; порівняти за критерієм його цілі",
+      "framework": "Goal-Criteria Comparison",
+      "urgency": "medium"
+    },
+    {
+      "id": "self_study",
+      "label": "«Я сам вивчу безкоштовно»",
+      "triggers": [
+        "сам вивчу",
+        "безкоштовно",
+        "самостійно вивчу",
+        "ютуб",
+        "сам навчуся"
+      ],
+      "core_response": "Визнати правоту; різниця у структурі, фідбеку, темпі",
+      "framework": "Validate + Structure-Feedback-Tempo",
+      "urgency": "medium"
+    },
+    {
+      "id": "too_old_no_base",
+      "label": "«Занадто старий / немає бази»",
+      "triggers": [
+        "занадто старий",
+        "немає бази",
+        "без бази",
+        "пізно починати",
+        "не моя сфера"
+      ],
+      "core_response": "Передумови з KB, приклади профілів",
+      "framework": "KB Prerequisites + Profile Examples",
+      "urgency": "medium"
+    },
+    {
+      "id": "send_email",
+      "label": "«Надішліть на пошту»",
+      "triggers": [
+        "надішліть на пошту",
+        "надішліть матеріали",
+        "пришліть",
+        "на email",
+        "надішліть інформацію"
+      ],
+      "core_response": "Надіслати + одразу зафіксувати дату наступного контакту",
+      "framework": "Send + Date Commit",
+      "urgency": "low"
+    },
+    {
+      "id": "wrong_moment",
+      "label": "«Зараз не той момент»",
+      "triggers": [
+        "не той момент",
+        "зараз не час",
+        "наступного року",
+        "не зараз",
+        "пізніше почну"
+      ],
+      "core_response": "Прив'язати до дедлайну його ж цілі, запропонувати наступний потік",
+      "framework": "Goal Deadline Anchor + Next Cohort",
+      "urgency": "medium"
+    },
+    {
+      "id": "distrust_online",
+      "label": "«Не довіряю онлайн-школам»",
+      "triggers": [
+        "не довіряю онлайн",
+        "онлайн-школ",
+        "скам",
+        "шахраї",
+        "кинули гроші"
+      ],
+      "core_response": "Прозорість: договір, повернення коштів, відкриті відгуки",
+      "framework": "Transparency Pack",
+      "urgency": "high"
     }
   ]
 }

@@ -1,0 +1,34 @@
+{
+  "id": "readiness-gate",
+  "version": 1,
+  "updated_at": "2026-09-17",
+  "note": "Readiness gate — допуск до живих дзвінків. До проходження — Live-дзвінки заблоковані, доступний тільки shadow-режим (слухає чужий дзвінок з видимим Copilot).",
+  "requirements": [
+    {
+      "id": "sim_volume_avg_score",
+      "description": "10 симуляцій рівня Rookie, середній бал ≥70",
+      "sim_min_count": 10,
+      "sim_min_avg_score": 70,
+      "level_alias": { "rookie": ["easy"] },
+      "level_note": "Rookie у ObjectionTrainer = difficulty 'easy'"
+    },
+    {
+      "id": "no_violations_recent",
+      "description": "Жодної вигаданої статистики чи обіцянки працевлаштування в останніх 5 симуляціях",
+      "recent_window": 5,
+      "max_violations": 0
+    },
+    {
+      "id": "archetypes_coverage",
+      "description": "Мінімум 8 із 12 архетипів відпрацьовано хоча б раз",
+      "min_archetypes": 8,
+      "archetypes_total": 12
+    },
+    {
+      "id": "full_flow_run",
+      "description": "Один «повний прогін» флоу від етапу 1 до 7 без пропущених блокерів",
+      "required_stages": ["opening", "current_situation", "motivation_goal", "qualification", "course_match", "objections", "next_step"]
+    }
+  ],
+  "on_fail": "Live-дзвінки заблоковані, доступний тільки shadow-режим"
+}

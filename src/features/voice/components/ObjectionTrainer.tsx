@@ -14,6 +14,8 @@ import {
   Shield,
   Zap,
 } from "lucide-react";
+import { recordSimResult, detectJobPromiseViolation, recordArchetypePractice } from "../../copilot/readiness-gate";
+import { detectRecruitmentObjection } from "../../copilot/screening-flow";
 
 interface ObjectionTrainerProps {
   icp: ICP | null;
@@ -164,6 +166,16 @@ export function ObjectionTrainer({ icp }: ObjectionTrainerProps) {
         improvements: result.improvements || ["Be more specific with data"],
         rebuttalTip: result.rebuttal_tip || "Try acknowledging the objection before rebutting."
       });
+      // Feed the readiness gate: every scored simulation counts.
+      const userTexts = allMessages.filter((m) => m.role === "user_rep").map((m) => m.text);
+      recordSimResult({
+        level: difficulty,
+        score: Math.min(100, Math.max(0, result.score || 65)),
+        fabricatedStatViolation: false,
+        jobPromiseViolation: userTexts.some((t) => detectJobPromiseViolation(t)),
+      });
+      const archetype = detectRecruitmentObjection(selectedObjection);
+      if (archetype) recordArchetypePractice(archetype.id);
       setMode("review");
     } catch (err) {
       setScoreResult({

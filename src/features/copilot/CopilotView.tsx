@@ -7,7 +7,7 @@
 // channel for the other side of a real call is a second-wave item.
 // ============================================================
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getProviderKey } from "../../stores/keys.store";
 import { getLeads, assertLeadCallable, addLeadNote } from "../../services/lead.service";
@@ -43,6 +43,7 @@ import {
 } from "../../configs/candidate-scorecard";
 import { scoreCandidate, scorecardSummary, type CriterionScores } from "./candidate-scorecard";
 import { PRECALL_CHEATSHEET_FACTS } from "../../configs/precall-cheatsheet";
+import { evaluateReadiness, loadReadinessStats, maybeRecordFullFlowRun } from "./readiness-gate";
 
 interface CopilotTurnResult {
   suggestion: string;
@@ -69,6 +70,10 @@ export function CopilotView() {
     motivation: 0, time: 0, budget: 0, readiness: 0, decision: 0,
   });
   const [noteSaved, setNoteSaved] = useState(false);
+  const [readinessStats, setReadinessStats] = useState(() => loadReadinessStats());
+  const [shadowMode, setShadowMode] = useState(false);
+
+  const readiness = useMemo(() => evaluateReadiness(readinessStats), [readinessStats]);
 
   const transcriptRef = useRef<TranscriptLine[]>([]);
   const triggerRef = useRef<CopilotTriggerState>(initialCopilotState);
@@ -192,6 +197,22 @@ export function CopilotView() {
   const startSession = useCallback(async () => {
     setGateError(null);
     setError(null);
+
+    // Readiness gate: unpassed rookies may only run shadow sessions —
+    // no lead binding, no compliance requirement, no live calls.
+    if (domain === "recruitment" && !readiness.passed) {
+      transcriptRef.current = [];
+      triggerRef.current = initialCopilotState;
+      setSuggestion(null);
+      setSources([]);
+      setFlowProgress(initialFlowProgress);
+      setRecruitmentObjection(null);
+      setShadowMode(true);
+      setSessionActive(true);
+      return;
+    }
+    setShadowMode(false);
+
     const lead = leads.find((l) => l.id === selectedLeadId);
     if (!lead) {
       setGateError("Select the lead you are calling first.");
@@ -215,16 +236,21 @@ export function CopilotView() {
     setFlowProgress(initialFlowProgress);
     setRecruitmentObjection(null);
     setSessionActive(true);
-  }, [leads, selectedLeadId]);
+  }, [leads, selectedLeadId, domain, readiness.passed]);
 
   const endSession = useCallback(() => {
     stopMicrophone();
     setSessionActive(false);
+    setShadowMode(false);
     setSuggestion(null);
     setQuestion("");
     // Post-call stage of the flow: scorecard + note + follow-up.
-    if (domain === "recruitment") setShowScorecard(true);
-  }, [stopMicrophone, domain]);
+    if (domain === "recruitment") {
+      const updated = maybeRecordFullFlowRun(flowProgress.completedStages);
+      if (updated) setReadinessStats(updated);
+      setShowScorecard(true);
+    }
+  }, [stopMicrophone, domain, flowProgress]);
 
   const saveScorecardNote = useCallback(async () => {
     const lead = leads.find((l) => l.id === selectedLeadId);
@@ -388,11 +414,29 @@ export function CopilotView() {
           </div>
         )}
 
+        {/* Readiness gate status (recruitment domain) */}
+        {domain === "recruitment" && (
+          <div className="px-5 pb-4">
+            <p
+              className={`rounded-lg p-2 text-[11px] font-mono font-bold ${
+                readiness.passed
+                  ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/25"
+                  : "text-orange-400 bg-orange-500/10 border border-orange-500/25"
+              }`}
+            >
+              {readiness.passed
+                ? "Readiness gate: PASSED"
+                : `SHADOW MODE доступний · живі дзвінки заблоковані до readiness gate · невиконано: ${readiness.unmet.map((u) => u.description).join("; ")}`}
+            </p>
+          </div>
+        )}
+
         <CopilotPanel
           domain={domain}
           onDomainChange={setDomain}
           listening={listening}
           sessionActive={sessionActive}
+          shadow={shadowMode || (domain === "recruitment" && !readiness.passed && sessionActive)}
           onToggleSession={
             sessionActive
               ? listening
