@@ -5,9 +5,24 @@
 // ============================================================
 
 import { memo } from "react";
-import { AudioLines, BookOpen, Mic, MicOff, PhoneOff, Zap } from "lucide-react";
+import { AlertTriangle, AudioLines, ArrowRight, BookOpen, Mic, MicOff, PhoneOff, Zap } from "lucide-react";
+import type { FlowQuestion } from "../../configs/screening-flow";
+import type { RecruitmentObjectionMatch } from "./screening-flow";
 
 export type CopilotDomain = "sales" | "recruitment";
+
+/** Guided-flow slice of the session, computed by CopilotView. */
+export interface FlowUiState {
+  stageNumber: number;
+  totalStages: number;
+  stageTitle: string;
+  timebox: string;
+  blockers: FlowQuestion[];
+  checkedIds: string[];
+  redFlags: { id: string; description: string }[];
+  nextQuestion: { stageTitle: string; question: FlowQuestion } | null;
+  canAdvance: boolean;
+}
 
 export interface CopilotPreset {
   label: string;
@@ -40,11 +55,16 @@ interface CopilotPanelProps {
   onManualQuestion: (question: string) => void;
   error: string | null;
   onEndSession: () => void;
+  flow?: FlowUiState | null;
+  onToggleBlocker?: (questionId: string) => void;
+  onAdvanceStage?: () => void;
+  objection?: RecruitmentObjectionMatch | null;
 }
 
 export const CopilotPanel = memo(function CopilotPanel({
   domain, onDomainChange, listening, sessionActive, onToggleSession,
   question, suggestion, sources, busy, onManualQuestion, error, onEndSession,
+  flow, onToggleBlocker, onAdvanceStage, objection,
 }: CopilotPanelProps) {
   return (
     <div className="w-full max-w-[420px] mx-auto flex flex-col gap-4 p-5">
@@ -142,6 +162,98 @@ export const CopilotPanel = memo(function CopilotPanel({
           </button>
         </form>
       </div>
+
+      {/* Guided screening flow (recruitment domain, live session) */}
+      {sessionActive && flow && (
+        <>
+          <div className="bg-[#0a0a0a] border border-white/[0.08] rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono text-gray-500 uppercase tracking-[0.15em] font-bold">
+                Етап {flow.stageNumber}/{flow.totalStages} · {flow.stageTitle}
+              </span>
+              <span className="text-[10px] font-mono text-gray-600">{flow.timebox}</span>
+            </div>
+            <div className="h-1 w-full bg-white/[0.06] rounded-full overflow-hidden mb-3">
+              <div
+                className="h-full bg-indigo-500/60 transition-all"
+                style={{ width: `${(flow.checkedIds.length / Math.max(flow.blockers.length, 1)) * 100}%` }}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {flow.blockers.map((q) => {
+                const checked = flow.checkedIds.includes(q.id);
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => onToggleBlocker?.(q.id)}
+                    className={`flex items-start gap-2 text-left text-[11px] font-mono rounded-lg px-2 py-1.5 transition-colors ${
+                      checked ? "text-emerald-300/80" : "text-gray-400 hover:bg-white/[0.03]"
+                    }`}
+                  >
+                    <span className={`mt-[1px] w-3.5 h-3.5 shrink-0 rounded border ${checked ? "bg-emerald-500/25 border-emerald-500/50" : "border-white/20"}`}>
+                      {checked ? "✓" : ""}
+                    </span>
+                    <span className={checked ? "line-through decoration-emerald-500/40" : ""}>{q.text}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {!flow.canAdvance && (
+              <p className="mt-2 text-[10px] font-mono text-orange-300/80">
+                Copilot не пускає на наступний етап: не всі питання-блокери відмічені.
+              </p>
+            )}
+            <button
+              onClick={onAdvanceStage}
+              disabled={!flow.canAdvance}
+              className={`mt-3 w-full rounded-xl px-3 py-2 text-[11px] font-mono font-bold transition-colors flex items-center justify-center gap-1.5 ${
+                flow.canAdvance
+                  ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/25"
+                  : "bg-white/[0.03] text-gray-600 border border-white/[0.05] cursor-not-allowed"
+              }`}
+            >
+              Завершити етап <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Pinned: next best question */}
+          {flow.nextQuestion && (
+            <div className="bg-indigo-500/[0.07] border border-indigo-500/25 rounded-2xl p-4">
+              <div className="text-[10px] font-mono text-indigo-300/70 uppercase tracking-[0.15em] font-bold mb-1.5">
+                Наступне найкраще питання · {flow.nextQuestion.stageTitle}
+              </div>
+              <p className="text-[14px] font-bold text-gray-100 leading-snug">{flow.nextQuestion.question.text}</p>
+            </div>
+          )}
+
+          {/* Recruitment objection alert */}
+          {objection && (
+            <div className="bg-orange-500/[0.07] border border-orange-500/25 rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
+                <span className="text-[11px] font-bold text-orange-400 uppercase tracking-wider">
+                  {objection.label} · {objection.framework}
+                </span>
+              </div>
+              <p className="text-[12px] text-gray-300 leading-relaxed">{objection.core_response}</p>
+            </div>
+          )}
+
+          {/* Red flags */}
+          {flow.redFlags.length > 0 && (
+            <div className="bg-red-500/[0.06] border border-red-500/25 rounded-2xl p-4">
+              <div className="text-[10px] font-mono text-red-400 uppercase tracking-[0.15em] font-bold mb-2">
+                Червоні прапорці
+              </div>
+              <ul className="flex flex-col gap-1">
+                {flow.redFlags.map((f) => (
+                  <li key={f.id} className="text-[11px] font-mono text-red-300/90">• {f.description}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Suggestion card */}
       <div className="bg-[#0a0a0a] border border-white/[0.08] rounded-2xl p-4">
