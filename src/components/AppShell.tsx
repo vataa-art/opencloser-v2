@@ -1,7 +1,7 @@
 import React from "react";
 import {
   Phone, Search, Settings, Plus, LayoutDashboard,
-  Target, Bot, Home, Swords, Zap, Bell, ChevronDown,
+  Target, Bot, Home, Swords, Zap, Bell, ChevronDown, GraduationCap,
 } from "lucide-react";
 import { APP_TITLE, NAV_ITEMS, SIDEBAR_TOP, SIDEBAR_BOTTOM } from "../constants";
 import type { AppPage } from "../stores/navigation.store";
@@ -17,7 +17,7 @@ interface AppShellProps {
 }
 
 const SIDEBAR_ICONS: Record<string, React.FC<{ className?: string }>> = {
-  Home, LayoutDashboard, Phone, Target, Bot, Swords, Settings,
+  Home, LayoutDashboard, Phone, Target, Bot, Swords, Settings, GraduationCap,
 };
 
 export function AppShell({

@@ -1,5 +1,7 @@
-
 import { Lead } from "../../../types";
+import { parseLeadsCsv, serializeLeadsCsv } from "../lib/csv";
+import { invoke } from "@tauri-apps/api/core";
+import { useRef } from "react";
 import {
   TrendingUp,
   Phone,
@@ -33,9 +35,42 @@ interface DashboardHomeProps {
   onDial: (lead: Lead) => void;
   onNavigate: (page: string) => void;
   addToast?: (type: "success" | "error" | "info" | "warning", message: string) => void;
+  onLeadsImported?: () => void;
 }
 
-export function DashboardHome({ leads, callLogs, onViewLead: _onViewLead, onDial: _onDial, onNavigate, addToast }: DashboardHomeProps) {
+export function DashboardHome({ leads, callLogs, onViewLead: _onViewLead, onDial: _onDial, onNavigate, addToast, onLeadsImported }: DashboardHomeProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const { leads: parsedLeads, skipped } = parseLeadsCsv(text);
+      
+      if (parsedLeads.length === 0) {
+        addToast?.("error", "No valid leads found in CSV.");
+        return;
+      }
+
+      const addedCount: number = await invoke("add_leads", { leads: parsedLeads });
+      addToast?.("success", `Imported ${addedCount} leads.`);
+      
+      const actuallySkipped = skipped + (parsedLeads.length - addedCount);
+      if (actuallySkipped > 0) {
+        addToast?.("warning", `Skipped ${actuallySkipped} duplicates or invalid rows.`);
+      }
+
+      onLeadsImported?.();
+    } catch (err) {
+      console.error(err);
+      addToast?.("error", "Failed to import leads.");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   // Stats
   const outbound = leads.filter(l => l.status === "Outbound Call").length;
   const closed = leads.filter(l => l.status === "Closed").length;
@@ -110,17 +145,22 @@ export function DashboardHome({ leads, callLogs, onViewLead: _onViewLead, onDial
             </div>
 
             <div className="flex items-center gap-3">
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleImport}
+              />
               <button 
-                onClick={() => onNavigate("hunter")}
+                onClick={() => fileInputRef.current?.click()}
                 className="flex-1 bg-[#1A1D20] text-white rounded-full py-3 text-[14px] font-semibold flex items-center justify-center gap-2 hover:bg-[#2D3136] transition-colors"
               >
                 <ArrowRightLeft className="w-4 h-4" /> Import
               </button>
               <button 
                 onClick={() => {
-                  const csv = [["Name","Company","Phone","Status","Score"].join(","),
-                    ...leads.map(l => [l.name,l.company,l.phone,l.status,l.score].join(","))
-                  ].join("\n");
+                  const csv = serializeLeadsCsv(leads);
                   const blob = new Blob([csv], {type: "text/csv"});
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement("a");

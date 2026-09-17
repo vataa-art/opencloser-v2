@@ -138,12 +138,12 @@ export function LeadHunter({ icp, onLeadsAdded, addToast }: LeadHunterProps) {
               {isScraping ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Extracting...
+                  Generating...
                 </>
               ) : (
                 <>
                   <Play className="w-5 h-5 fill-current" />
-                  Start Campaign
+                  Generate demo
                 </>
               )}
             </button>

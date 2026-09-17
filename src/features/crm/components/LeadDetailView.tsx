@@ -4,6 +4,7 @@ import { Lead, LeadStatus, ICP } from "../../../types";
 import { setLeadCompliance } from "../../../services/lead.service";
 import { useLeadStore } from "../../../stores/lead.store";
 import { isDoNotCall, hasConsent } from "../lib/compliance";
+import { confirmWritePrompt, requiresConfirm } from "../lib/confirm-write";
 import {
   ArrowLeft,
   Phone,
@@ -100,7 +101,7 @@ export function LeadDetailView({ lead, icp: _icp, onBack, onDial, onDelete, onSt
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Delete ${lead.name} and all associated data? This cannot be undone.`)) return;
+    if (!confirm(confirmWritePrompt("delete", lead.name))) return;
     try {
       await invoke("delete_lead", { id: lead.id });
       onDelete(lead.id);
@@ -245,14 +246,21 @@ export function LeadDetailView({ lead, icp: _icp, onBack, onDial, onDelete, onSt
             >
               <PhoneCall className="w-5 h-5" />
               <span className="font-bold flex flex-col items-start leading-none uppercase tracking-widest text-xs">
-                 <span>Initiate</span>
-                 <span className="text-[10px] text-white/70 mt-1">Autonomous Execution</span>
+                 <span>Call</span>
+                 <span className="text-[10px] text-white/70 mt-1">War Room</span>
               </span>
             </button>
             <div className="relative group/select">
               <select
                 value={lead.status}
-                onChange={(e) => onStatusChange(lead.id, e.target.value as LeadStatus)}
+                onChange={(e) => {
+                  const next = e.target.value as LeadStatus;
+                  if (requiresConfirm(next) && !confirm(confirmWritePrompt("Closed", lead.name))) {
+                    e.currentTarget.value = lead.status;
+                    return;
+                  }
+                  onStatusChange(lead.id, next);
+                }}
                 className="w-full bg-surface-bg border border-surface-border rounded-xl pl-4 pr-10 py-3.5 text-xs font-bold text-ink-secondary focus:outline-none focus:border-coral/30 transition-smooth appearance-none cursor-pointer hover:border-ink-secondary/20 uppercase tracking-widest"
               >
                 {STATUSES.map(s => (
@@ -459,7 +467,7 @@ export function LeadDetailView({ lead, icp: _icp, onBack, onDial, onDelete, onSt
                       <div className="flex items-center justify-between mb-8 pb-4 border-b border-surface-border/50">
                         <div className="flex items-center gap-3">
                            <div className="w-2.5 h-2.5 rounded-full bg-coral"></div>
-                           <h4 className="text-[12px] font-bold text-ink uppercase tracking-widest italic">Autonomous Intelligence Matrix</h4>
+                           <h4 className="text-[12px] font-bold text-ink uppercase tracking-widest italic">Transcript</h4>
                         </div>
                         <div className="text-[10px] font-mono text-ink-muted uppercase tracking-widest">{Array.isArray(transcriptData) ? transcriptData.length : 0} Session Nodes</div>
                       </div>

@@ -29,7 +29,7 @@ OpenCloser is an **open-source, AI-powered sales development platform** that run
 |---|---|---|
 | **Strategy** | Hire a consultant ($5K+/mo) | AI Strategist generates ICP using SPIN & Challenger in minutes |
 | **Research** | SDR manually Googles leads (hours) | Demo Lead Generator produces synthetic leads (real sourcing is a roadmap item) |
-| **Cold Calling** | SDR dials 50 calls/day, burns out | AI Caller dials with perfect pitch, never tired |
+| **Cold Calling** | SDR dials 50 calls/day, burns out | WarRoom + virtual audio cable (no PSTN). Sequential queue, not a parallel dialer |
 | **Coaching** | Manager reviews recordings (hours) | AI Coach gives instant post-call analysis |
 | **Training** | Roleplay sessions (awkward, infrequent) | AI Sparring Partner available 24/7, adjustable difficulty |
 | **Analytics** | Spreadsheets and gut feelings | Real-time dashboards, sentiment analysis, pipeline tracking |
@@ -55,7 +55,7 @@ Generates your Ideal Customer Profile (ICP) using SPIN & Challenger frameworks. 
 Generates **fictional** demo leads for call rehearsal — it does not scrape websites or source real prospects (real sourcing is a roadmap item). Industry-aware demo mode with 5 keyword categories when no API key is configured. Full local-first CRM with Kanban pipeline management.
 
 ### 📞 AI Caller (SDR)
-Real-time AI voice agent powered by Google Gemini (also supports OpenAI Realtime and ElevenLabs ConvAI). Virtual audio bridge for phone integration. Live transcription, sentiment analysis, and objection detection. Power dialing mode for high-volume outreach.
+Real-time AI voice agent (Gemini / OpenAI Realtime / ElevenLabs) over a **virtual audio cable** (VB-Cable / BlackHole) — not a PSTN dialer. Live transcription and phrase-map objection hints. Sequential “power dial” queue through Outbound Call leads (one at a time). Live mode sends audio/transcripts to your chosen providers.
 
 ### 🎯 AI Sales Coach
 Objection sparring trainer with 3 difficulty levels (Rookie, Pro, Elite). Practice handling 12 objection archetypes against an AI prospect. Real-time encouragement and post-session scoring with specific improvement tips.
@@ -131,10 +131,10 @@ opencloser/
 | **Frontend** | React 19, TypeScript strict, Tailwind CSS 3, Vite 6, Zustand 5 |
 | **Desktop Runtime** | Tauri 2.10 |
 | **Backend** | Rust (rusqlite, reqwest, tokio, tokio-tungstenite) |
-| **Database** | SQLite — local-first, zero cloud dependency |
+| **Database** | SQLite on disk (CRM). Live AI still uses the cloud providers you configure |
 | **AI** | Google Gemini 2.5 Flash, OpenAI Realtime, ElevenLabs ConvAI |
 | **Voice** | Web Audio API + AudioWorklet (zero-latency PCM capture) |
-| **Tests** | Vitest + React Testing Library (67 tests, 9 suites) + Rust relay contract tests |
+| **Tests** | Vitest + React Testing Library (178 tests) + Rust kb-core / hiring-core |
 | **CI/CD** | GitHub Actions — lint, test, build, cargo check/fmt/clippy/test, Tauri build |
 
 ---

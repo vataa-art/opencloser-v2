@@ -1,0 +1,33 @@
+{
+  "id": "fixture-sales-001",
+  "lead": {
+    "name": "Jordan Hale",
+    "company": "Northwind Ops"
+  },
+  "transcript": [
+    {
+      "role": "user",
+      "text": "Hello, it is too expensive."
+    },
+    {
+      "role": "model",
+      "text": "I hear you."
+    },
+    {
+      "role": "user",
+      "text": "We already use your competitor, Acme."
+    },
+    {
+      "role": "model",
+      "text": "We differ by providing highly customized integration options and superior overall system uptime."
+    },
+    {
+      "role": "user",
+      "text": "Interesting. How much does this cost? It seems too expensive still."
+    },
+    {
+      "role": "model",
+      "text": "It costs $499 per month, and we guarantee complete satisfaction always."
+    }
+  ]
+}

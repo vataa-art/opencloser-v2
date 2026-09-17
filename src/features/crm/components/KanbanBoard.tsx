@@ -16,7 +16,8 @@ import { WelcomeScreen } from "./shell/WelcomeScreen";
 import { AIPersona } from "../../../types/persona";
 import { Toast, ToastMessage, ToastType } from "../../../ui/components/Toast";
 import { hasAnyProviderKey, useKeysStore } from "../../../stores/keys.store";
-import { isDoNotCall } from "../lib/compliance";
+import { isDoNotCall, canStartLiveCall, liveCallBlockReason } from "../lib/compliance";
+import { confirmWritePrompt, requiresConfirm } from "../lib/confirm-write";
 
 const WarRoom = React.lazy(() => import("../../voice/components/WarRoom").then(m => ({ default: m.WarRoom })));
 const PostCallDebrief = React.lazy(() => import("../../voice/components/PostCallDebrief").then(m => ({ default: m.PostCallDebrief })));
@@ -131,12 +132,20 @@ export function KanbanBoard() {
     const leadId = e.dataTransfer.getData("leadId");
     const leadToMove = leads.find((l) => l.id === leadId);
     if (!leadToMove || leadToMove.status === status) return;
+    if (requiresConfirm(status) && !confirm(confirmWritePrompt("Closed", leadToMove.name))) {
+      return;
+    }
 
     const previousStatus = leadToMove.status;
     setLeads((prev) => prev.map((lead) => (lead.id === leadId ? { ...lead, status } : lead)));
 
     if (status === "Outbound Call") {
-      setActiveCallLead({ ...leadToMove, status });
+      const blocked = isDoNotCall(leadToMove) || (hasVoiceKey && !canStartLiveCall(leadToMove));
+      if (blocked) {
+        addToast("error", liveCallBlockReason(leadToMove) ?? "Cannot start a live call");
+      } else {
+        setActiveCallLead({ ...leadToMove, status });
+      }
     }
 
     try {
@@ -152,7 +161,7 @@ export function KanbanBoard() {
       );
       addToast("error", `Failed to move lead — reverted to ${previousStatus}.`);
     }
-  }, [addToast, leads]);
+  }, [addToast, leads, hasVoiceKey]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); }, []);
 
@@ -173,11 +182,22 @@ export function KanbanBoard() {
       addToast("error", "Lead is on the Do Not Call list");
       return;
     }
+    if (hasVoiceKey) {
+      const reason = liveCallBlockReason(lead);
+      if (reason) {
+        addToast("error", reason);
+        return;
+      }
+    }
     setActiveCallLead(lead);
-  }, [addToast]);
+  }, [addToast, hasVoiceKey]);
 
   const startPowerDialing = useCallback(() => {
-    const outboundLeads = leads.filter((l) => l.status === "Outbound Call" && !isDoNotCall(l));
+    const outboundLeads = leads.filter((l) => {
+      if (l.status !== "Outbound Call" || isDoNotCall(l)) return false;
+      if (hasVoiceKey && !canStartLiveCall(l)) return false;
+      return true;
+    });
     if (outboundLeads.length === 0) {
       addToast("info", "No leads in the Outbound Call column to dial.");
       return;
@@ -185,7 +205,7 @@ export function KanbanBoard() {
     setIsPowerDialing(true);
     setActiveCallLead(outboundLeads[0]);
     addToast("info", `Starting Power Dial session with ${outboundLeads.length} leads.`);
-  }, [addToast, leads]);
+  }, [addToast, leads, hasVoiceKey]);
 
   const handleViewLead = useCallback((lead: Lead) => {
     setSelectedLead(lead);
@@ -195,7 +215,11 @@ export function KanbanBoard() {
   const handleWarRoomClose = (callTranscript?: any[], callDuration?: number) => {
     const closedLead = activeCallLead;
     if (isPowerDialing && activeCallLead) {
-      const outboundLeads = leads.filter((l) => l.status === "Outbound Call" && !isDoNotCall(l));
+      const outboundLeads = leads.filter((l) => {
+        if (l.status !== "Outbound Call" || isDoNotCall(l)) return false;
+        if (hasVoiceKey && !canStartLiveCall(l)) return false;
+        return true;
+      });
       const currentIndex = outboundLeads.findIndex((l) => l.id === activeCallLead.id);
       if (currentIndex !== -1 && currentIndex + 1 < outboundLeads.length) {
         setActiveCallLead(outboundLeads[currentIndex + 1]);
@@ -315,6 +339,7 @@ export function KanbanBoard() {
               onDial={handleDial}
               onNavigate={(page) => setAppState(page as AppState)}
               addToast={addToast}
+              onLeadsImported={fetchLeads}
             />
           )}
 

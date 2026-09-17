@@ -64,7 +64,7 @@ export function CallLogsView() {
             Call Intelligence Center
           </h2>
           <p className="text-ink-secondary text-sm mt-1 font-medium italic">
-            Telemetry data from autonomous sales execution sessions.
+            Recorded War Room sessions.
           </p>
         </div>
       </div>

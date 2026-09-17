@@ -6,6 +6,7 @@ import { kbSearch } from "../services/kb.service";
 import {
   coachAdvise,
   createDebouncedCoach,
+  extractOfferClaims,
   extractStatClaims,
   flagUnverifiedClaims,
 } from "../features/voice/lib/coach-agent";
@@ -41,6 +42,11 @@ describe("extractStatClaims", () => {
   it("returns no duplicates", () => {
     const claims = extractStatClaims("3x growth, again 3x growth");
     expect(claims).toHaveLength(1);
+  });
+
+  it("extracts money amounts as offer claims", () => {
+    const raws = extractOfferClaims("List is $1,200 per seat.").map((c) => c.raw);
+    expect(raws.some((r) => r.includes("1,200") || r.includes("1200"))).toBe(true);
   });
 });
 
@@ -133,6 +139,29 @@ describe("coachAdvise", () => {
     expect(mockedKbSearch).toHaveBeenCalledWith(
       expect.objectContaining({ query: expect.stringContaining("Salesforce") })
     );
+  });
+
+  it("flags money and guarantee claims missing from KB", async () => {
+    mockedKbSearch.mockResolvedValue({
+      results: [{ source: "offer", text: "Pilot is billed after a 90-day trial.", score: 0.6 }],
+      embedder: "local-hash-256",
+    });
+    const advice = await coachAdvise({
+      objection,
+      transcript: [{ role: "model", text: "It's only $499 and we guarantee results." }],
+    });
+    const raws = advice.flaggedClaims.map((c) => c.raw.toLowerCase());
+    expect(raws.some((r) => r.includes("499"))).toBe(true);
+    expect(raws.some((r) => r.includes("guarantee"))).toBe(true);
+  });
+
+  it("refuses to invent a price when KB is empty", async () => {
+    mockedKbSearch.mockResolvedValue({ results: [], embedder: "local-hash-256" });
+    const advice = await coachAdvise({
+      objection: null,
+      transcript: [{ role: "user", text: "How much does this cost?" }],
+    });
+    expect(advice.hints.join(" ")).toMatch(/don't invent a number/i);
   });
 });
 

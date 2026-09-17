@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   X, FileText, Brain, ShieldAlert, Lightbulb, Mail, Copy, CheckCircle2,
   ArrowRight, TrendingUp, TrendingDown, Minus
 } from "lucide-react";
 import { analyzeCallTranscript } from "../../../services/ai.service";
 import { Lead, ICP } from "../../../types";
+import { buildSalesDebrief } from "../../crm/lib/debrief";
 
 interface TranscriptEntry {
   id: string;
@@ -47,6 +48,7 @@ export function PostCallDebrief({ lead, icp, transcript, durationSeconds, onClos
   const [analysis, setAnalysis] = useState<CallAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [copiedEmail, setCopiedEmail] = useState(false);
+  const localDebrief = useMemo(() => buildSalesDebrief(transcript), [transcript]);
 
   useEffect(() => {
     analyzeCall();
@@ -125,6 +127,14 @@ export function PostCallDebrief({ lead, icp, transcript, durationSeconds, onClos
                  <span className="text-gray-400 text-sm font-medium">{lead.name} at {lead.company}</span>
                  <span className="text-gray-600">&#x2022;</span>
                  <span className="text-purple-400 text-sm font-mono tracking-wider font-bold">{formatDuration(durationSeconds)}</span>
+                 <span className="text-gray-600">&#x2022;</span>
+                 <span className="text-gray-500 text-xs font-mono">
+                   talk {Math.round(localDebrief.talk_ratio * 100)}%
+                   {localDebrief.objections.filter((o) => !o.addressed).length > 0
+                     ? ` · open ${localDebrief.objections.filter((o) => !o.addressed).length}`
+                     : ""}
+                   {localDebrief.risks.length > 0 ? ` · ${localDebrief.risks.join(" ")}` : ""}
+                 </span>
               </div>
             </div>
           </div>

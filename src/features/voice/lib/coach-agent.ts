@@ -83,6 +83,36 @@ export function flagUnverifiedClaims(
     }));
 }
 
+const MONEY_RE = /(?:\$|€|£)\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s?(?:usd|eur|uah|грн)\b/gi;
+const GUARANTEE_RE = /\b(guaranteed?|we promise|won't fail|cannot fail|100%\s+success)\b/gi;
+const TIMELINE_RE =
+  /\b(by\s+(monday|tuesday|wednesday|thursday|friday|eod|eow)|this week|end of (the )?(day|week|month)|we'll close (today|tomorrow))\b/gi;
+const PRICE_QUESTION_RE =
+  /\b(how much|what('s| is) the (price|cost|rate)|вилка|скільки коштує|guarantee|when (do|will) we (start|close)|timeline|слот)\b/i;
+
+export function extractOfferClaims(text: string): StatClaim[] {
+  const out: StatClaim[] = [...extractStatClaims(text)];
+  const seen = new Set(out.map((c) => c.raw.toLowerCase()));
+  const push = (raw: string, kind: StatClaim["kind"]) => {
+    const key = raw.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push({ raw, kind });
+    }
+  };
+  for (const m of text.match(MONEY_RE) ?? []) push(m.trim(), "percent");
+  for (const m of text.match(GUARANTEE_RE) ?? []) push(m.trim(), "ratio");
+  for (const m of text.match(TIMELINE_RE) ?? []) push(m.trim(), "ratio");
+  return out;
+}
+
+export function isPriceOrTimelineQuestion(text: string): boolean {
+  return PRICE_QUESTION_RE.test(text);
+}
+
+const UNVERIFIED_OFFER =
+  "No verified price, guarantee, or timeline in KB — don't invent a number.";
+
 function modelTexts(transcript: { role: string; text: string }[]): string[] {
   return transcript.filter((t) => t.role === "model").map((t) => t.text);
 }
@@ -118,8 +148,10 @@ export async function coachAdvise(input: {
     // KB unavailable — advise without grounding rather than failing the call.
   }
 
+  const lastUser =
+    input.transcript.filter((t) => t.role === "user").slice(-1)[0]?.text ?? "";
   const flagged = flagUnverifiedClaims(
-    extractStatClaims(modelTexts(input.transcript).join(" ")),
+    extractOfferClaims(modelTexts(input.transcript).join(" ")),
     hits.map((h) => h.text)
   );
 
@@ -130,11 +162,16 @@ export async function coachAdvise(input: {
       : ""
     : "";
 
+  const hints = hits.slice(0, 2).map((h) => `📚 ${trimChunk(h.text, 140)} [KB: ${h.source}]`);
+  if (isPriceOrTimelineQuestion(lastUser) && hits.length === 0) {
+    hints.unshift(`⚠ ${UNVERIFIED_OFFER}`);
+  }
+
   return {
     counterScript,
     sources: hits.map((h) => h.source),
     flaggedClaims: flagged,
-    hints: hits.slice(0, 2).map((h) => `📚 ${trimChunk(h.text, 140)} [KB: ${h.source}]`),
+    hints,
   };
 }
 
