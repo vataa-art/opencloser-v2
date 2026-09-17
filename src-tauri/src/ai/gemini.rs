@@ -641,9 +641,16 @@ pub struct ObjectionTrainerResponse {
     pub role: String,
     pub text: String,
     pub is_complete: bool,
+    // Function-calling responses arrive without responseSchema, so every
+    // optional field must tolerate absence instead of failing the parse
+    // (union-alpha review round 2).
+    #[serde(default)]
     pub score: Option<i32>,
+    #[serde(default)]
     pub strengths: Vec<String>,
+    #[serde(default)]
     pub improvements: Vec<String>,
+    #[serde(default)]
     pub rebuttal_tip: String,
 }
 
@@ -684,7 +691,9 @@ pub async fn objection_trainer_turn(
         Before quoting ANY statistic, percentage, or factual claim, call \
         search_knowledge_base to verify it against verified training material; \
         only cite numbers that appear in the results.
-        Return JSON: role='ai_prospect', text=<your next line>, isComplete=false (unless score requested).",
+        Return JSON: role='ai_prospect', text=<your next line>, isComplete=false. \
+        When scoring the rep (score requested), also include score, strengths, \
+        improvements, rebuttalTip.",
         req.objection, req.difficulty, messages_text.join("\n")
     );
 

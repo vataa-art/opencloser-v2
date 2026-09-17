@@ -64,6 +64,15 @@ describe("flagUnverifiedClaims — fabricated statistics must be flagged", () =>
     const flagged = flagUnverifiedClaims(extractStatClaims("You could get 3x pipeline growth."), kb);
     expect(flagged).toHaveLength(0);
   });
+
+  it("does not let a substring figure verify a claim (3x vs 13x, 7% vs 27%)", () => {
+    const kb = ["Clients report 13x productivity and 27% savings."];
+    const flagged = flagUnverifiedClaims(
+      extractStatClaims("We deliver 3x productivity and 7% savings."),
+      kb
+    );
+    expect(flagged.map((c) => c.raw).sort()).toEqual(["3x", "7%"]);
+  });
 });
 
 describe("coachAdvise", () => {

@@ -84,16 +84,6 @@ async fn embed_with_gemini(api_key: &str, text: &str) -> Result<Vec<f32>, String
 /// Embed `text` with Gemini when a key is available, otherwise fall back to
 /// the deterministic offline embedder. Returns the vector plus the embedder
 /// id that must be stored with (and searched against) the chunk.
-async fn embed_text(text: &str, api_key: &Option<String>) -> Result<(Vec<f32>, &'static str), String> {
-    if let Some(key) = valid_key(api_key) {
-        match embed_with_gemini(&key, text).await {
-            Ok(vec) => return Ok((vec, GEMINI_EMBEDDER_ID)),
-            Err(e) => log::warn!("Gemini embedding failed, falling back to local: {}", e),
-        }
-    }
-    Ok((embed_local(text), LOCAL_EMBEDDER_ID))
-}
-
 #[derive(Serialize)]
 pub struct KbIngestResult {
     pub chunks: usize,
@@ -154,7 +144,7 @@ pub async fn kb_ingest_document(
 
     let mut embedded: Vec<(String, Vec<f32>, &'static str)> = Vec::with_capacity(chunks.len());
     for (idx, chunk) in chunks.iter().enumerate() {
-        let (vec, embedder) = embed_text(chunk, &api_key).await?;
+        let (vec, embedder) = embed_for_ingest(chunk, &api_key).await?;
         embedded.push((format!("{}:{}:{}", domain, source, idx), vec, embedder));
     }
     let embedder = embedded
@@ -162,18 +152,23 @@ pub async fn kb_ingest_document(
         .map(|(_, _, e)| e.to_string())
         .unwrap_or_else(|| LOCAL_EMBEDDER_ID.to_string());
 
-    let conn = open_db(&app)?;
-    // Re-ingest must be atomic per source: without this delete, a shorter
-    // document leaves stale higher-index chunks searchable (union-alpha
-    // iter-1 review finding).
-    conn.execute(
+    let mut conn = open_db(&app)?;
+    // Re-ingest is transactional: without the delete a shorter document
+    // leaves stale chunks; without the transaction a failed insert loses
+    // previously stored content (union-alpha review findings).
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("Failed to begin kb ingest transaction: {}", e))?;
+    tx.execute(
         "DELETE FROM kb_chunks WHERE domain = ?1 AND source = ?2",
         rusqlite::params![domain, source],
     )
     .map_err(|e| format!("Failed to clear old kb chunks: {}", e))?;
     for ((id, vec, embedder), chunk) in embedded.iter().zip(&chunks) {
-        insert_chunk(&conn, id, &domain, &source, chunk, vec, embedder, &tags_json)?;
+        insert_chunk(&tx, id, &domain, &source, chunk, vec, embedder, &tags_json)?;
     }
+    tx.commit()
+        .map_err(|e| format!("Failed to commit kb ingest: {}", e))?;
     Ok(KbIngestResult { chunks: embedded.len(), embedder })
 }
 
@@ -185,8 +180,7 @@ fn search_conn(
     embedder: &str,
     domain: Option<&str>,
     k: usize,
-) -> Result<Vec<Hit>, String> {
-    let sql = match domain {
+) -> Result<Vec<Hit>, String> {    let sql = match domain {
         Some(_) => "SELECT source, text, embedding, dim FROM kb_chunks WHERE embedder = ?1 AND domain = ?2",
         None => "SELECT source, text, embedding, dim FROM kb_chunks WHERE embedder = ?1",
     };
@@ -233,16 +227,61 @@ fn search_conn(
     Ok(rank(&query_vec, &candidates, k))
 }
 
+/// Ingest-time embedding: Gemini when a key exists, deterministic local
+/// embedder otherwise (fallback logged, never fatal).
+async fn embed_for_ingest(text: &str, api_key: &Option<String>) -> Result<(Vec<f32>, &'static str), String> {
+    if let Some(key) = valid_key(api_key) {
+        match embed_with_gemini(&key, text).await {
+            Ok(vec) => return Ok((vec, GEMINI_EMBEDDER_ID)),
+            Err(e) => log::warn!("Gemini embedding failed, falling back to local: {}", e),
+        }
+    }
+    Ok((embed_local(text), LOCAL_EMBEDDER_ID))
+}
+
+/// Query-time embedding for search: the local vector is always produced;
+/// the Gemini vector is added when a key exists (failure tolerated so the
+/// local index keeps working).
+async fn embed_query_both(query: &str, api_key: &Option<String>) -> (Vec<f32>, Option<Vec<f32>>) {
+    let local = embed_local(query);
+    let mut gemini = None;
+    if let Some(key) = valid_key(api_key) {
+        match embed_with_gemini(&key, query).await {
+            Ok(vec) => gemini = Some(vec),
+            Err(e) => log::warn!("Gemini query embedding failed, local index only: {}", e),
+        }
+    }
+    (local, gemini)
+}
+
+/// Search across BOTH embedder populations: the always-present local index
+/// (what seeding produces) plus the Gemini index when a query embedding
+/// exists. Merging guarantees seeded knowledge stays visible regardless of
+/// key state (union-alpha review round 2: single-embedder filtering hid
+/// seeded rows once a working key existed). Sync by design — the caller
+/// awaits all embedding BEFORE touching the connection.
+fn search_both(
+    conn: &Connection,
+    local_vec: &[f32],
+    gemini_vec: Option<&[f32]>,
+    domain: Option<&str>,
+    k: usize,
+) -> Result<(Vec<Hit>, String), String> {
+    let mut hits = search_conn(conn, local_vec, LOCAL_EMBEDDER_ID, domain, k)?;
+    let mut searched = LOCAL_EMBEDDER_ID.to_string();
+    if let Some(gv) = gemini_vec {
+        searched = GEMINI_EMBEDDER_ID.to_string();
+        hits.append(&mut search_conn(conn, gv, GEMINI_EMBEDDER_ID, domain, k)?);
+    }
+    hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    hits.truncate(k);
+    Ok((hits, searched))
+}
+
 /// KB grounding for model tool-calls: run a top-3 search and shape it as
 /// the `functionResponse` payload for `search_knowledge_base`.
 pub(crate) async fn tool_search(app: &AppHandle, query: &str, api_key: &Option<String>) -> serde_json::Value {
-    let (query_vec, embedder) = match embed_text(query, api_key).await {
-        Ok(pair) => pair,
-        Err(e) => {
-            log::warn!("KB tool search embed failed: {}", e);
-            return serde_json::json!({ "results": [], "error": "embedding unavailable" });
-        }
-    };
+    let (local_vec, gemini_vec) = embed_query_both(query, api_key).await;
     let conn = match open_db(app) {
         Ok(conn) => conn,
         Err(e) => {
@@ -250,7 +289,13 @@ pub(crate) async fn tool_search(app: &AppHandle, query: &str, api_key: &Option<S
             return serde_json::json!({ "results": [], "error": "knowledge base unavailable" });
         }
     };
-    let hits = search_conn(&conn, &query_vec, embedder, None, 3).unwrap_or_default();
+    let hits = match search_both(&conn, &local_vec, gemini_vec.as_deref(), None, 3) {
+        Ok((hits, _)) => hits,
+        Err(e) => {
+            log::warn!("KB tool search failed: {}", e);
+            return serde_json::json!({ "results": [], "error": "search failed" });
+        }
+    };
     serde_json::json!({
         "results": hits
             .iter()
@@ -259,9 +304,8 @@ pub(crate) async fn tool_search(app: &AppHandle, query: &str, api_key: &Option<S
     })
 }
 
-/// Vector search over `kb_chunks`. The query is embedded with the active
-/// embedder and compared against chunks stored by the same embedder, so a
-/// key-less offline index never mixes with Gemini-embedded rows.
+/// Vector search over `kb_chunks` across both embedder indexes
+/// (see `search_merged`).
 #[tauri::command]
 pub async fn kb_search(
     app: AppHandle,
@@ -274,17 +318,16 @@ pub async fn kb_search(
         return Err("query is required".into());
     }
     let k = k.unwrap_or(5).clamp(1, 50) as usize;
-    let (query_vec, embedder) = embed_text(&query, &api_key).await?;
-
+    let (local_vec, gemini_vec) = embed_query_both(&query, &api_key).await;
     let conn = open_db(&app)?;
-    let hits = search_conn(&conn, &query_vec, embedder, domain.as_deref(), k)?;
+    let (hits, embedder) = search_both(&conn, &local_vec, gemini_vec.as_deref(), domain.as_deref(), k)?;
 
     Ok(KbSearchResponse {
         results: hits
             .into_iter()
             .map(|h| KbSearchHit { source: h.source, text: h.text, score: h.score })
             .collect(),
-        embedder: embedder.to_string(),
+        embedder,
     })
 }
 

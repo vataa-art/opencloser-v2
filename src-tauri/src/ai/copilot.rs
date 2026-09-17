@@ -44,6 +44,11 @@ pub async fn copilot_turn(
     }
     let domain = domain.unwrap_or_else(|| "sales".to_string());
 
+    // Retrieval is intentionally cross-domain: the KB is one shared corpus,
+    // and verified material from any vertical should ground an answer
+    // (e.g. the "API design" transcript for a sales question). The domain
+    // shapes the answer persona in the prompt and the UI presets, not the
+    // retrieval scope (union-alpha review round 2, resolved as decision).
     let grounding = kb::tool_search(&app, &question, &api_key).await;
     let sources: Vec<String> = grounding["results"]
         .as_array()

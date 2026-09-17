@@ -61,21 +61,25 @@ export function extractStatClaims(text: string): StatClaim[] {
 
 /**
  * A claim is "supported" when the same figure appears in one of the
- * retrieved knowledge-base chunks. Anything else is treated as invented.
+ * retrieved knowledge-base chunks. Matching is boundary-checked so "3x"
+ * does not verify against "13x" and "7%" against "27%" (union-alpha
+ * review round 2).
  */
+function claimSupported(claim: StatClaim, kbTexts: string[]): boolean {
+  const escaped = claim.raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(?<![\\d.])${escaped}(?![\\d])`, "i");
+  return kbTexts.some((t) => re.test(t));
+}
+
 export function flagUnverifiedClaims(
   claims: StatClaim[],
   kbTexts: string[]
 ): FlaggedClaim[] {
-  const haystack = kbTexts.map((t) => t.toLowerCase());
   return claims
-    .filter((claim) => !haystack.some((t) => t.includes(claim.raw)))
+    .filter((claim) => !claimSupported(claim, kbTexts))
     .map((claim) => ({
       ...claim,
-      reason:
-        claim.kind === "percent"
-          ? `"${claim.raw}" is not backed by any knowledge-base source`
-          : `"${claim.raw}" is not backed by any knowledge-base source`,
+      reason: `"${claim.raw}" is not backed by any knowledge-base source`,
     }));
 }
 
