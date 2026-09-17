@@ -103,6 +103,7 @@ pub struct KbSearchResponse {
     pub embedder: String,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn insert_chunk(
     conn: &Connection,
     id: &str,
@@ -112,11 +113,15 @@ fn insert_chunk(
     embedding: &[f32],
     embedder: &str,
     tags_json: &str,
+    // v8 hiring columns: set only for hiring-domain documents (e.g. a
+    // published vacancy card); course seed rows keep them NULL.
+    vacancy_id: Option<&str>,
+    doc_type: Option<&str>,
 ) -> Result<(), String> {
     conn.execute(
-        "INSERT OR REPLACE INTO kb_chunks (id, domain, source, text, embedding, dim, embedder, tags) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-        rusqlite::params![id, domain, source, text, embedding_blob(embedding), embedding.len(), embedder, tags_json],
+        "INSERT OR REPLACE INTO kb_chunks (id, domain, source, text, embedding, dim, embedder, tags, vacancy_id, doc_type) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        rusqlite::params![id, domain, source, text, embedding_blob(embedding), embedding.len(), embedder, tags_json, vacancy_id, doc_type],
     )
     .map_err(|e| format!("Failed to insert kb chunk: {}", e))?;
     Ok(())
@@ -124,6 +129,9 @@ fn insert_chunk(
 
 /// Ingest one document: clean, chunk, embed every chunk, and store them
 /// under `(domain, source)`. Re-ingesting the same source replaces chunks.
+/// The hiring columns (`vacancy_id`, `doc_type`) are optional and only set
+/// by hiring-domain callers (e.g. `vacancy_publish_to_kb`); existing
+/// frontend callers omit them and they arrive as `None`.
 #[tauri::command]
 pub async fn kb_ingest_document(
     app: AppHandle,
@@ -132,6 +140,8 @@ pub async fn kb_ingest_document(
     text: String,
     tags: Option<Vec<String>>,
     api_key: Option<String>,
+    vacancy_id: Option<String>,
+    doc_type: Option<String>,
 ) -> Result<KbIngestResult, String> {
     if domain.trim().is_empty() || source.trim().is_empty() {
         return Err("domain and source are required".into());
@@ -165,7 +175,7 @@ pub async fn kb_ingest_document(
     )
     .map_err(|e| format!("Failed to clear old kb chunks: {}", e))?;
     for ((id, vec, embedder), chunk) in embedded.iter().zip(&chunks) {
-        insert_chunk(&tx, id, &domain, &source, chunk, vec, embedder, &tags_json)?;
+        insert_chunk(&tx, id, &domain, &source, chunk, vec, embedder, &tags_json, vacancy_id.as_deref(), doc_type.as_deref())?;
     }
     tx.commit()
         .map_err(|e| format!("Failed to commit kb ingest: {}", e))?;
@@ -356,7 +366,7 @@ fn seed_document(
     for (idx, chunk) in chunks.iter().enumerate() {
         let vec = embed_local(chunk);
         let id = format!("{}:{}:{}", domain, source, idx);
-        if insert_chunk(conn, &id, domain, source, chunk, &vec, LOCAL_EMBEDDER_ID, tags_json).is_ok() {
+        if insert_chunk(conn, &id, domain, source, chunk, &vec, LOCAL_EMBEDDER_ID, tags_json, None, None).is_ok() {
             inserted += 1;
         }
     }

@@ -1,6 +1,7 @@
 mod agy;
 mod ai;
 mod db;
+mod hiring;
 mod relay;
 mod secrets;
 
@@ -73,6 +74,10 @@ pub fn run() {
             ai::kb::kb_ingest_document,
             ai::kb::kb_search,
             ai::copilot::copilot_turn,
+            hiring::vacancy::vacancy_create,
+            hiring::vacancy::vacancy_publish_to_kb,
+            hiring::candidate::candidate_upsert,
+            hiring::pipeline::pipeline_move,
             get_relay_port,
             get_relay_token,
             secrets::secret_set,

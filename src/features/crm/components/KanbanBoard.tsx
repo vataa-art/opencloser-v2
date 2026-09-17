@@ -25,6 +25,7 @@ const LeadDetailView = React.lazy(() => import("./LeadDetailView").then(m => ({ 
 const ObjectionTrainer = React.lazy(() => import("../../voice/components/ObjectionTrainer").then(m => ({ default: m.ObjectionTrainer })));
 const RecruitmentKnowledgeView = React.lazy(() => import("../../recruitment/components/RecruitmentKnowledgeView").then(m => ({ default: m.RecruitmentKnowledgeView })));
 const CopilotView = React.lazy(() => import("../../copilot/CopilotView").then(m => ({ default: m.CopilotView })));
+const VacancyIntake = React.lazy(() => import("../../recruitment/hiring/VacancyIntake").then(m => ({ default: m.VacancyIntake })));
 
 const LazyFallback = () => (
   <div className="flex items-center justify-center h-full" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 13 }}>
@@ -35,7 +36,7 @@ const LazyFallback = () => (
 type AppState =
   | "onboarding" | "icp_review" | "audio_setup" | "persona_setup"
   | "home" | "dashboard" | "hunter" | "call_logs" | "settings"
-  | "persona" | "agy" | "lead_detail" | "trainer" | "recruitment" | "copilot" | "welcome";
+  | "persona" | "agy" | "lead_detail" | "trainer" | "recruitment" | "copilot" | "hiring" | "welcome";
 
 export function KanbanBoard() {
   const voiceKeys = useKeysStore((s) => s.keys);
@@ -355,6 +356,12 @@ export function KanbanBoard() {
           {appState === "copilot" && (
             <Suspense fallback={<LazyFallback />}>
             <CopilotView />
+            </Suspense>
+          )}
+
+          {appState === "hiring" && (
+            <Suspense fallback={<LazyFallback />}>
+            <VacancyIntake />
             </Suspense>
           )}
 

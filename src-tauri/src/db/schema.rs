@@ -5,7 +5,7 @@ use tauri::{AppHandle, Manager};
 
 /// Latest schema version. Bump this and add a migration step below for
 /// every schema change; `PRAGMA user_version` tracks what has been applied.
-const SCHEMA_VERSION: i64 = 7;
+const SCHEMA_VERSION: i64 = 8;
 
 pub fn init(app_handle: &AppHandle) {
     let app_dir = app_handle
@@ -32,6 +32,21 @@ pub fn init(app_handle: &AppHandle) {
     // Bring new databases straight to the latest shape.
     conn.execute_batch(BASE_SCHEMA)
         .expect("Failed to create database schema");
+
+    // Hiring vertical (schema v8): fresh databases get the five hiring
+    // tables straight away. DDL lives in hiring-core::ddl (single source of
+    // truth, unit-tested there) and is IF NOT EXISTS, so this is idempotent
+    // alongside run_migrations below.
+    for ddl in [
+        hiring_core::ddl::VACANCIES_DDL,
+        hiring_core::ddl::CANDIDATES_DDL,
+        hiring_core::ddl::CANDIDATE_PIPELINE_DDL,
+        hiring_core::ddl::SCREENING_SESSIONS_DDL,
+        hiring_core::ddl::SCORECARDS_DDL,
+    ] {
+        conn.execute_batch(ddl)
+            .expect("Failed to create hiring schema");
+    }
 
     // Apply versioned migrations for databases created by older builds.
     run_migrations(&conn);
@@ -122,10 +137,14 @@ const BASE_SCHEMA: &str = "
         dim INTEGER NOT NULL,
         embedder TEXT NOT NULL DEFAULT 'local-hash-256',
         tags TEXT NOT NULL DEFAULT '[]',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        vacancy_id TEXT,
+        doc_type TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_kb_chunks_domain ON kb_chunks(domain, embedder);
+    CREATE INDEX IF NOT EXISTS idx_kb_chunks_domain_vacancy
+        ON kb_chunks(domain, vacancy_id);
 ";
 
 fn user_version(conn: &Connection) -> i64 {
@@ -255,6 +274,31 @@ fn run_migrations(conn: &Connection) {
         }
         safe_alter("CREATE INDEX IF NOT EXISTS idx_kb_chunks_domain ON kb_chunks(domain, embedder)");
         set_user_version(conn, 7);
+    }
+
+    // v7 → v8: P1 hiring vertical (P1-RECRUITMENT-HIRING.md §1) — five
+    // hiring tables, nullable kb_chunks.vacancy_id / doc_type, and the
+    // (domain, vacancy_id) retrieval index. Existing course seed stays
+    // domain="recruitment" — nothing is mass-migrated. Fresh databases
+    // already have this shape, so ALTERs may report "duplicate column"
+    // (absorbed by safe_alter, same as earlier column migrations).
+    if version < 8 {
+        for ddl in [
+            hiring_core::ddl::VACANCIES_DDL,
+            hiring_core::ddl::CANDIDATES_DDL,
+            hiring_core::ddl::CANDIDATE_PIPELINE_DDL,
+            hiring_core::ddl::SCREENING_SESSIONS_DDL,
+            hiring_core::ddl::SCORECARDS_DDL,
+        ] {
+            if let Err(e) = conn.execute_batch(ddl) {
+                log::error!("Failed to create hiring table: {}", e);
+            }
+        }
+        for step in hiring_core::ddl::KB_CHUNKS_V8_STEPS {
+            safe_alter(step);
+        }
+        safe_alter(hiring_core::ddl::KB_CHUNKS_V8_INDEX);
+        set_user_version(conn, 8);
     }
 
     info!(

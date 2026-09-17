@@ -46,6 +46,7 @@ export const SIDEBAR_TOP = [
   { icon: "Bot", state: "persona", label: "AI Caller" },
   { icon: "Swords", state: "trainer", label: "Sales Coach" },
   { icon: "GraduationCap", state: "recruitment", label: "Recruitment Academy" },
+  { icon: "Briefcase", state: "hiring", label: "Hiring" },
   { icon: "AudioLines", state: "copilot", label: "Live Copilot" },
 ] as const;
 
