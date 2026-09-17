@@ -1,0 +1,22 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "_status": "IDs verified via GET https://opencode.ai/zen/v1/models (union-alpha, big-pickle, grok-4.6). Local CLI missing (was 1.18.25 today, binary gone). Do not run until opencode --version works.",
+  "model": "xai/grok-4.6",
+  "agent": {
+    "supervisor": {
+      "mode": "primary",
+      "model": "xai/grok-4.6",
+      "description": "Планує, оцінює, вирішує чи продовжувати цикл. Пише WORKFLOW_STATE.md. Не редагує src окрім workflow docs."
+    },
+    "implementor": {
+      "mode": "subagent",
+      "model": "opencode/union-alpha",
+      "description": "Пише і редагує код у project/. Один owner на shared tree."
+    },
+    "tester": {
+      "mode": "subagent",
+      "model": "opencode/big-pickle",
+      "description": "Запускає lint/test/build і пише звіт. Не змінює product src без FAIL-fix доручення."
+    }
+  }
+}

@@ -1,0 +1,123 @@
+{
+  "id": "recruitment-screening-flow",
+  "version": 1,
+  "updated_at": "2026-09-17",
+  "note": "Керований сценарій дзвінка (screening flow). Поки не відмічені питання-блокери, Copilot не пускає на наступний етап і показує нагадування.",
+  "stages": [
+    {
+      "id": "opening",
+      "order": 1,
+      "title": "Відкриття",
+      "timebox": "0:00–0:45",
+      "blocking_questions": [
+        { "id": "intro_school", "text": "Представлення + назва школи" },
+        { "id": "consent_recording", "text": "Розкриття запису («розмову записуємо для якості, ок?»)" },
+        { "id": "confirm_convenient", "text": "Підтвердження, що зараз зручно" },
+        { "id": "call_goal", "text": "Мета дзвінка за 1 речення" }
+      ],
+      "autofill": ["consent_recording", "call_started_at"]
+    },
+    {
+      "id": "current_situation",
+      "order": 2,
+      "title": "Поточна ситуація",
+      "timebox": "0:45–3:00",
+      "blocking_questions": [
+        { "id": "current_occupation", "text": "Чим займаєтесь зараз?" },
+        { "id": "experience_level", "text": "Який досвід у сфері?" },
+        { "id": "lead_source", "text": "Звідки дізналися / чому залишили заявку?" }
+      ],
+      "autofill": ["current_role", "experience_level", "source"]
+    },
+    {
+      "id": "motivation_goal",
+      "order": 3,
+      "title": "Мотивація і ціль",
+      "timebox": "3:00–6:00",
+      "blocking_questions": [
+        { "id": "goal_6_12_months", "text": "Який результат хочете через 6–12 місяців?" },
+        { "id": "why_now", "text": "Чому саме зараз?" },
+        { "id": "cost_of_inaction", "text": "Що буде, якщо нічого не змінювати?" }
+      ],
+      "autofill": ["goal", "urgency", "pain"]
+    },
+    {
+      "id": "qualification",
+      "order": 4,
+      "title": "Кваліфікація",
+      "timebox": "6:00–10:00",
+      "blocking_questions": [
+        { "id": "hours_per_week", "text": "Скільки годин на тиждень готові приділяти?" },
+        { "id": "budget_installments", "text": "Який бюджет розглядаєте / чи потрібна розстрочка?" },
+        { "id": "prerequisites", "text": "Рівень англійської / техніка?" },
+        { "id": "decision_makers", "text": "Хто ще бере участь у рішенні?" }
+      ],
+      "autofill": ["hours_per_week", "budget", "prerequisites", "decision_makers"]
+    },
+    {
+      "id": "course_match",
+      "order": 5,
+      "title": "Підбір курсу",
+      "timebox": "10:00–14:00",
+      "blocking_questions": [
+        { "id": "present_options", "text": "Озвучити 1–2 варіанти з KB з ціною, тривалістю і датою старту" },
+        { "id": "fit_check", "text": "Перевірити: «чи це відповідає вашій цілі?»" }
+      ],
+      "autofill": ["recommended_course_id", "quoted_price"]
+    },
+    {
+      "id": "objections",
+      "order": 6,
+      "title": "Заперечення",
+      "timebox": "14:00–18:00",
+      "blocking_questions": [
+        { "id": "clarify_first", "text": "Прояснити заперечення питанням, перш ніж відповідати" },
+        { "id": "confirm_resolved", "text": "Підтвердити, чи знято заперечення" }
+      ],
+      "autofill": ["objections[]"]
+    },
+    {
+      "id": "next_step",
+      "order": 7,
+      "title": "Наступний крок",
+      "timebox": "18:00–20:00",
+      "blocking_questions": [
+        { "id": "concrete_action", "text": "Конкретна дія + дата + канал" },
+        { "id": "confirm_send", "text": "Підтвердити, що надішлю" },
+        { "id": "repeat_agreement", "text": "Повторити домовленість вголос" }
+      ],
+      "autofill": ["next_step", "next_step_date"]
+    },
+    {
+      "id": "post_call",
+      "order": 8,
+      "title": "Після дзвінка",
+      "timebox": "—",
+      "blocking_questions": [
+        { "id": "scorecard_filled", "text": "Скоркарта заповнена" },
+        { "id": "note_written", "text": "Нотатка додана" },
+        { "id": "followup_same_day", "text": "Follow-up заплановано на той же день" }
+      ],
+      "autofill": ["scorecard", "debrief"]
+    }
+  ],
+  "red_flags": [
+    { "id": "talk_ratio_over_65", "description": "Рекрутер говорить >65% часу" },
+    { "id": "qualification_skipped", "description": "Етап 4 (кваліфікація) пропущено" },
+    { "id": "price_without_start_date", "description": "Названо ціну без дати старту" },
+    { "id": "next_step_without_date", "description": "Етап 7 без конкретної дати" },
+    { "id": "consent_not_confirmed", "description": "Згода на запис не підтверджена" }
+  ],
+  "forbidden_topics": [
+    "вік",
+    "сімейний стан",
+    "діти",
+    "вагітність",
+    "національність",
+    "релігія",
+    "стан здоров'я",
+    "політичні погляди"
+  ],
+  "forbidden_enforcement": "hard_block",
+  "forbidden_note": "Заборонені питання — жорсткий блок, не підказка: Copilot не генерує і не пересилає такі питання."
+}

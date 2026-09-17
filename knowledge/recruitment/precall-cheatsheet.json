@@ -1,0 +1,13 @@
+{
+  "id": "precall-cheatsheet",
+  "version": 1,
+  "updated_at": "2026-09-17",
+  "note": "Pre-call cheat sheet — п'ять фактів за 10 секунд до дзвінка.",
+  "facts": [
+    { "id": "who_and_source", "title": "Хто дзвонить", "detail": "ім'я + звідки заявка" },
+    { "id": "course_of_interest", "title": "Курс інтересу", "detail": "курс, яким цікавився кандидат" },
+    { "id": "price_and_start", "title": "Ціна і старт", "detail": "ціна і найближчий старт" },
+    { "id": "likely_objections", "title": "Ймовірні заперечення", "detail": "3 найімовірніші заперечення для цього сегмента" },
+    { "id": "previous_contact", "title": "Попередній контакт", "detail": "підсумок попереднього контакту одним рядком" }
+  ]
+}
