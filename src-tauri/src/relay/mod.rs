@@ -26,6 +26,7 @@ use tokio_tungstenite::tungstenite::protocol::Message;
 pub type RelayPort = u16;
 
 const HANDSHAKE_TIMEOUT_SECS: u64 = 15;
+const CARTESIA_API_VERSION: &str = "2026-08-14";
 
 pub async fn start_relay_server(
     auth_token: String,
@@ -91,10 +92,8 @@ async fn handle_connection(stream: TcpStream, expected_token: String) {
 
     let provider = config["provider"].as_str().unwrap_or("openai").to_string();
     let api_key = config["apiKey"].as_str().unwrap_or("");
-    let model = config["model"]
-        .as_str()
-        .unwrap_or("gpt-4o-realtime-preview");
-    let voice = config["voice"].as_str().unwrap_or("alloy");
+    let model = config["model"].as_str().unwrap_or("gpt-realtime-2.1");
+    let voice = config["voice"].as_str().unwrap_or("marin");
     let system_prompt = config["systemPrompt"].as_str().unwrap_or("");
 
     if api_key.is_empty() {
@@ -109,6 +108,7 @@ async fn handle_connection(stream: TcpStream, expected_token: String) {
     let connect_result = match provider.as_str() {
         "deepgram" => connect_deepgram(api_key, &config).await,
         "elevenlabs" => connect_elevenlabs(api_key, &config).await,
+        "cartesia" => connect_cartesia(api_key, &config).await,
         "openai" => connect_openai(api_key, model, voice, system_prompt).await,
         _ => Err(format!("Unsupported voice provider: {}", provider)),
     };
@@ -248,10 +248,12 @@ fn provider_session_ready(provider: &str, text: &str) -> bool {
     let parsed: Result<Value, _> = serde_json::from_str(text);
     let Ok(v) = parsed else { return false };
     match provider {
-        "openai" => v["type"] == "session.created",
+        "openai" => v["type"] == "session.updated",
         "elevenlabs" => v["type"] == "conversation_initiation_metadata",
+        "cartesia" => v["type"] == "session_ready",
         // Deepgram: any JSON frame implies the socket is live.
-        _ => true,
+        "deepgram" => true,
+        _ => false,
     }
 }
 
@@ -273,6 +275,13 @@ fn adapt_client_audio(provider: &str, pcm: &[u8]) -> Message {
             })
             .to_string(),
         ),
+        "cartesia" => Message::Text(
+            serde_json::json!({
+                "type": "audio_input",
+                "audio": engine.encode(pcm),
+            })
+            .to_string(),
+        ),
         _ => Message::Binary(pcm.to_vec()),
     }
 }
@@ -287,12 +296,12 @@ fn translate_provider_text(provider: &str, text: &str) -> Vec<Message> {
     let engine = base64::engine::general_purpose::STANDARD;
 
     match (provider, event_type) {
-        ("openai", "response.audio.delta") => v["delta"]
+        ("openai", "response.output_audio.delta") => v["delta"]
             .as_str()
             .and_then(|b64| engine.decode(b64).ok())
             .map(|pcm| vec![Message::Binary(pcm)])
             .unwrap_or_default(),
-        ("openai", "response.audio_transcript.delta") => {
+        ("openai", "response.output_audio_transcript.delta") => {
             text_event("transcript.model", v["delta"].as_str().unwrap_or(""))
         }
         ("openai", "conversation.item.input_audio_transcription.completed") => {
@@ -321,6 +330,46 @@ fn translate_provider_text(provider: &str, text: &str) -> Vec<Message> {
                 .as_str()
                 .unwrap_or(""),
         ),
+        ("cartesia", "audio_output") => v["audio"]
+            .as_str()
+            .and_then(|b64| engine.decode(b64).ok())
+            .map(|pcm| vec![Message::Binary(pcm)])
+            .unwrap_or_default(),
+        ("cartesia", "audio_output_clear") => {
+            vec![Message::Text(r#"{"type":"interrupted"}"#.into())]
+        }
+        ("cartesia", "turn_ended") => {
+            let kind = match v["role"].as_str().unwrap_or("") {
+                "assistant" => "transcript.model",
+                "user" => "transcript.user",
+                _ => return Vec::new(),
+            };
+            text_event(kind, v["text"].as_str().unwrap_or(""))
+        }
+        ("cartesia", "client_tool_call") => {
+            if v["tool_name"] != "request_human_handoff" {
+                return Vec::new();
+            }
+            let reason = v["parameters"]["reason"]
+                .as_str()
+                .unwrap_or("Prospect requested a human");
+            vec![Message::Text(
+                serde_json::json!({
+                    "type": "handoff.requested",
+                    "toolCallId": v["tool_call_id"].as_str().unwrap_or(""),
+                    "reason": reason,
+                    "expectsResponse": v["expects_response"].as_bool().unwrap_or(false),
+                })
+                .to_string(),
+            )]
+        }
+        ("cartesia", "error") => vec![Message::Text(
+            serde_json::json!({
+                "type": "error",
+                "message": v["message"].as_str().unwrap_or("Cartesia agent error"),
+            })
+            .to_string(),
+        )],
         ("deepgram", "Results") => {
             let is_final = v["is_final"].as_bool().unwrap_or(false);
             let transcript = v["channel"]["alternatives"][0]["transcript"]
@@ -363,28 +412,36 @@ async fn connect_openai(
         AUTHORIZATION,
         HeaderValue::from_str(&auth).map_err(|e| format!("Invalid Authorization header: {}", e))?,
     );
-    // Required by OpenAI Realtime API
-    request
-        .headers_mut()
-        .insert("OpenAI-Beta", HeaderValue::from_static("realtime=v1"));
-
     let (provider_ws, _) = tokio_tungstenite::connect_async(request)
         .await
         .map_err(|e| format!("Provider connection failed: {}", e))?;
 
-    let payload = serde_json::json!({
-        "type": "session.update",
-        "session": {
-            "modalities": ["text", "audio"],
-            "instructions": system_prompt,
-            "voice": voice,
-            "input_audio_format": "pcm16",
-            "output_audio_format": "pcm16",
-            "temperature": 0.8,
-        }
-    });
+    let payload = openai_session_payload(model, voice, system_prompt);
 
     Ok((provider_ws, Some(payload)))
+}
+
+fn openai_session_payload(model: &str, voice: &str, system_prompt: &str) -> Value {
+    serde_json::json!({
+        "type": "session.update",
+        "session": {
+            "type": "realtime",
+            "model": model,
+            "output_modalities": ["audio"],
+            "instructions": system_prompt,
+            "audio": {
+                "input": {
+                    "format": { "type": "audio/pcm", "rate": 24000 },
+                    "transcription": { "model": "gpt-4o-mini-transcribe" },
+                    "turn_detection": { "type": "semantic_vad" }
+                },
+                "output": {
+                    "format": { "type": "audio/pcm", "rate": 24000 },
+                    "voice": voice
+                }
+            }
+        }
+    })
 }
 
 async fn connect_deepgram(
@@ -452,6 +509,60 @@ async fn connect_elevenlabs(
     Ok((provider_ws, Some(payload)))
 }
 
+async fn connect_cartesia(
+    api_key: &str,
+    config: &Value,
+) -> Result<(ProviderWs, Option<Value>), String> {
+    let agent_id = config["agentId"].as_str().unwrap_or("").trim();
+    if !is_safe_cartesia_agent_id(agent_id) {
+        return Err(
+            "Cartesia agentId is required and must use only letters, digits, '_' or '-'".into(),
+        );
+    }
+
+    let url = format!(
+        "wss://api.cartesia.ai/v1/agents/websocket/{}?cartesia_version={}",
+        agent_id, CARTESIA_API_VERSION
+    );
+    let mut request = url
+        .into_client_request()
+        .map_err(|e| format!("Invalid Cartesia agent URL: {}", e))?;
+    request.headers_mut().insert(
+        "X-API-Key",
+        HeaderValue::from_str(api_key)
+            .map_err(|e| format!("Invalid Cartesia API key header: {}", e))?,
+    );
+
+    let (provider_ws, _) = tokio_tungstenite::connect_async(request)
+        .await
+        .map_err(|e| format!("Cartesia connection failed: {}", e))?;
+
+    Ok((provider_ws, Some(cartesia_session_payload(config))))
+}
+
+fn is_safe_cartesia_agent_id(agent_id: &str) -> bool {
+    !agent_id.is_empty()
+        && agent_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+}
+
+fn cartesia_session_payload(config: &Value) -> Value {
+    let system_prompt = config["systemPrompt"].as_str().unwrap_or("");
+    let language = config["language"].as_str().unwrap_or("en-US");
+    serde_json::json!({
+        "type": "session_create",
+        "audio": {
+            "input_format": "pcm_16000",
+            "output_delivery": "speaking_pace"
+        },
+        "dynamic_variables": {
+            "opencloser_context": system_prompt,
+            "opencloser_language": language
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -503,7 +614,7 @@ mod tests {
         let b64 = base64::engine::general_purpose::STANDARD.encode([1, 2, 3]);
         let frames = translate_provider_text(
             "openai",
-            &serde_json::json!({ "type": "response.audio.delta", "delta": b64 }).to_string(),
+            &serde_json::json!({ "type": "response.output_audio.delta", "delta": b64 }).to_string(),
         );
         assert_eq!(frames.len(), 1);
         assert_eq!(decoded_audio(&frames[0]), vec![1, 2, 3]);
@@ -514,7 +625,7 @@ mod tests {
         let frames = translate_provider_text(
             "openai",
             &serde_json::json!({
-                "type": "response.audio_transcript.delta",
+                "type": "response.output_audio_transcript.delta",
                 "delta": "Hello there"
             })
             .to_string(),
@@ -536,6 +647,20 @@ mod tests {
             &serde_json::json!({ "type": "input_audio_buffer.speech_started" }).to_string(),
         );
         assert_eq!(json_text(&frames[0])["type"], "interrupted");
+    }
+
+    #[test]
+    fn openai_session_payload_uses_the_ga_realtime_schema() {
+        let payload = openai_session_payload("gpt-realtime-2.1", "marin", "Be concise");
+        assert_eq!(payload["session"]["type"], "realtime");
+        assert_eq!(payload["session"]["model"], "gpt-realtime-2.1");
+        assert_eq!(payload["session"]["output_modalities"][0], "audio");
+        assert_eq!(
+            payload["session"]["audio"]["input"]["format"]["rate"],
+            24000
+        );
+        assert_eq!(payload["session"]["audio"]["output"]["voice"], "marin");
+        assert_eq!(payload["session"]["instructions"], "Be concise");
     }
 
     #[test]
@@ -565,6 +690,77 @@ mod tests {
             &serde_json::json!({ "type": "interruption" }).to_string(),
         );
         assert_eq!(json_text(&frames[0])["type"], "interrupted");
+    }
+
+    #[test]
+    fn cartesia_audio_and_conversation_events_are_translated() {
+        let client_audio = adapt_client_audio("cartesia", &[3, 4]);
+        let v = json_text(&client_audio);
+        assert_eq!(v["type"], "audio_input");
+        assert_eq!(
+            v["audio"],
+            base64::engine::general_purpose::STANDARD.encode([3, 4])
+        );
+
+        let output_audio = base64::engine::general_purpose::STANDARD.encode([8, 9]);
+        let frames = translate_provider_text(
+            "cartesia",
+            &serde_json::json!({ "type": "audio_output", "audio": output_audio }).to_string(),
+        );
+        assert_eq!(decoded_audio(&frames[0]), vec![8, 9]);
+
+        let frames = translate_provider_text(
+            "cartesia",
+            &serde_json::json!({
+                "type": "turn_ended",
+                "role": "assistant",
+                "text": "Домовились"
+            })
+            .to_string(),
+        );
+        let v = json_text(&frames[0]);
+        assert_eq!(v["type"], "transcript.model");
+        assert_eq!(v["text"], "Домовились");
+
+        let frames = translate_provider_text(
+            "cartesia",
+            &serde_json::json!({ "type": "audio_output_clear" }).to_string(),
+        );
+        assert_eq!(json_text(&frames[0])["type"], "interrupted");
+
+        let frames = translate_provider_text(
+            "cartesia",
+            &serde_json::json!({
+                "type": "client_tool_call",
+                "tool_call_id": "tool_123",
+                "tool_name": "request_human_handoff",
+                "parameters": { "reason": "Pricing approval" },
+                "expects_response": true
+            })
+            .to_string(),
+        );
+        let v = json_text(&frames[0]);
+        assert_eq!(v["type"], "handoff.requested");
+        assert_eq!(v["toolCallId"], "tool_123");
+        assert_eq!(v["reason"], "Pricing approval");
+    }
+
+    #[test]
+    fn cartesia_session_payload_uses_pcm16_and_opencloser_context() {
+        let payload = cartesia_session_payload(&serde_json::json!({
+            "systemPrompt": "Represent innie.pro safely",
+            "language": "uk"
+        }));
+        assert_eq!(payload["type"], "session_create");
+        assert_eq!(payload["audio"]["input_format"], "pcm_16000");
+        assert_eq!(payload["audio"]["output_delivery"], "speaking_pace");
+        assert_eq!(
+            payload["dynamic_variables"]["opencloser_context"],
+            "Represent innie.pro safely"
+        );
+        assert_eq!(payload["dynamic_variables"]["opencloser_language"], "uk");
+        assert!(is_safe_cartesia_agent_id("agent_test-123"));
+        assert!(!is_safe_cartesia_agent_id("../bad"));
     }
 
     #[test]
@@ -599,11 +795,11 @@ mod tests {
     fn session_ready_requires_provider_specific_handshake() {
         assert!(provider_session_ready(
             "openai",
-            r#"{"type":"session.created"}"#
+            r#"{"type":"session.updated"}"#
         ));
         assert!(!provider_session_ready(
             "openai",
-            r#"{"type":"session.updated"}"#
+            r#"{"type":"session.created"}"#
         ));
         assert!(provider_session_ready(
             "elevenlabs",
@@ -611,5 +807,14 @@ mod tests {
         ));
         assert!(!provider_session_ready("elevenlabs", r#"{"type":"ping"}"#));
         assert!(provider_session_ready("deepgram", r#"{"type":"Results"}"#));
+        assert!(provider_session_ready(
+            "cartesia",
+            r#"{"type":"session_ready","call_id":"ac_test"}"#
+        ));
+        assert!(!provider_session_ready(
+            "cartesia",
+            r#"{"type":"turn_started"}"#
+        ));
+        assert!(!provider_session_ready("unknown", r#"{"type":"anything"}"#));
     }
 }

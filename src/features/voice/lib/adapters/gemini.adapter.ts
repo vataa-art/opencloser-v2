@@ -8,6 +8,8 @@ import { GoogleGenAI, Modality, LiveServerMessage } from "@google/genai";
 import { getProviderKey } from "../../../../stores/keys.store";
 import { CallerEngine, type EngineCallbacks } from "./base";
 
+const GEMINI_LIVE_MODEL = "gemini-3.8-live";
+
 export class GeminiCallerEngine extends CallerEngine {
   private session: any = null;
   private sessionPromise: Promise<any> | null = null;
@@ -27,7 +29,7 @@ export class GeminiCallerEngine extends CallerEngine {
     const ai = new GoogleGenAI({ apiKey });
 
     this.sessionPromise = ai.live.connect({
-      model: "gemini-2.5-flash-native-audio-preview-09-2025",
+      model: GEMINI_LIVE_MODEL,
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {

@@ -356,6 +356,20 @@ export function WarRoom({ lead, icp, onClose }: WarRoomProps) {
           playbackQueueRef.current = [];
           playbackQueueIndexRef.current = 0;
         },
+        onHandoffRequested: (reason) => {
+          setCallState("closing");
+          const line: TranscriptLine = {
+            id: `handoff_${Date.now()}_${Math.random()}`,
+            role: "model",
+            text: `[Human handoff requested: ${reason}]`,
+            timestamp: Date.now(),
+          };
+          setTranscript(prev => {
+            const next = [...prev, line];
+            transcriptRef.current = next;
+            return next;
+          });
+        },
         onError: (err) => setError(err.message),
       });
 

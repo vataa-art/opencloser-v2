@@ -15,9 +15,12 @@ import {
   float32ToPcm16,
   openRelayConnection,
   relayPcmToBase64,
+  resampleFloat32,
 } from "./base";
 
-const OPENAI_REALTIME_MODEL = "gpt-4o-realtime-preview";
+const OPENAI_REALTIME_MODEL = "gpt-realtime-2.1";
+const CAPTURE_SAMPLE_RATE = 16000;
+const OPENAI_SAMPLE_RATE = 24000;
 
 export class OpenAICallerEngine extends CallerEngine {
   private ws: WebSocket | null = null;
@@ -76,7 +79,8 @@ export class OpenAICallerEngine extends CallerEngine {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     // OpenAI expects raw PCM16 frames; the relay wraps them into
     // input_audio_buffer.append events server-side.
-    this.ws.send(float32ToPcm16(float32));
+    const resampled = resampleFloat32(float32, CAPTURE_SAMPLE_RATE, OPENAI_SAMPLE_RATE);
+    this.ws.send(float32ToPcm16(resampled));
   }
 
   disconnect(): void {

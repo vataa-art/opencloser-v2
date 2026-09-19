@@ -51,7 +51,7 @@ describe("OpenAI Realtime adapter", () => {
     expect(config.provider).toBe("openai");
     expect(config.apiKey).toBe("sk-test");
     expect(config.token).toBe("relay-token");
-    expect(config.model).toBe("gpt-4o-realtime-preview");
+    expect(config.model).toBe("gpt-realtime-2.1");
     expect(config.voice).toBe("nova");
     expect(config.systemPrompt).toBe("You are an SDR");
     expect(ws.url).toContain("ws://127.0.0.1:41234?provider=openai");
@@ -113,7 +113,7 @@ describe("OpenAI Realtime adapter", () => {
     expect(callbacks.onError).toHaveBeenCalled();
   });
 
-  it("streams microphone audio as raw PCM16 frames", async () => {
+  it("resamples 16 kHz microphone audio to 24 kHz PCM16 frames", async () => {
     const engine = new OpenAICallerEngine(noopCallbacks());
     const ready = engine.connect("prompt", "alloy", "en-US");
     const ws = await waitForSocket();
@@ -125,8 +125,9 @@ describe("OpenAI Realtime adapter", () => {
     const binary = ws.sentBinary();
     expect(binary).toHaveLength(1);
     const samples = new Int16Array(binary[0]);
+    expect(samples).toHaveLength(3);
     expect(samples[0]).toBeGreaterThan(16000);
-    expect(samples[1]).toBeLessThan(-16000);
+    expect(samples[2]).toBeLessThan(-16000);
   });
 
   it("falls back to the demo engine when no key is configured", async () => {

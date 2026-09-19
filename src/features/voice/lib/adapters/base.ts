@@ -27,6 +27,7 @@ export interface EngineCallbacks {
   onAudio: (pcm16Base64: string, sampleRate: number) => void;
   onTranscript: (line: TranscriptLine) => void;
   onInterrupted: () => void;
+  onHandoffRequested?: (reason: string) => void;
   onError: (err: Error) => void;
 }
 
@@ -61,6 +62,32 @@ export function float32ToPcm16(float32: Float32Array): ArrayBuffer {
     pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
   }
   return pcm16.buffer;
+}
+
+/** Resample mono Float32 PCM with linear interpolation. */
+export function resampleFloat32(
+  input: Float32Array,
+  inputRate: number,
+  outputRate: number
+): Float32Array {
+  if (inputRate <= 0 || outputRate <= 0) {
+    throw new RangeError("Audio sample rates must be positive");
+  }
+  if (input.length === 0 || inputRate === outputRate) return input.slice();
+
+  const outputLength = Math.max(1, Math.round(input.length * outputRate / inputRate));
+  const output = new Float32Array(outputLength);
+  const ratio = inputRate / outputRate;
+
+  for (let i = 0; i < outputLength; i += 1) {
+    const position = i * ratio;
+    const left = Math.min(Math.floor(position), input.length - 1);
+    const right = Math.min(left + 1, input.length - 1);
+    const fraction = position - left;
+    output[i] = input[left] + (input[right] - input[left]) * fraction;
+  }
+
+  return output;
 }
 
 export function bytesToBase64(bytes: Uint8Array): string {
@@ -109,6 +136,7 @@ export interface RelayFrameHandlers {
   onTranscript: (role: "user" | "model", text: string) => void;
   onInterrupted: () => void;
   onAudio: (pcm16: ArrayBuffer) => void;
+  onHandoffRequested?: (toolCallId: string, reason: string, expectsResponse: boolean) => void;
 }
 
 /**
@@ -119,7 +147,14 @@ export interface RelayFrameHandlers {
 export function attachRelayHandlers(ws: WebSocket, handlers: RelayFrameHandlers): void {
   ws.onmessage = (event) => {
     if (typeof event.data === "string") {
-      let msg: { type?: string; text?: string; message?: string };
+      let msg: {
+        type?: string;
+        text?: string;
+        message?: string;
+        reason?: string;
+        toolCallId?: string;
+        expectsResponse?: boolean;
+      };
       try {
         msg = JSON.parse(event.data);
       } catch {
@@ -137,6 +172,13 @@ export function attachRelayHandlers(ws: WebSocket, handlers: RelayFrameHandlers)
           break;
         case "interrupted":
           handlers.onInterrupted();
+          break;
+        case "handoff.requested":
+          handlers.onHandoffRequested?.(
+            msg.toolCallId ?? "",
+            msg.reason || "Prospect requested a human",
+            msg.expectsResponse === true
+          );
           break;
         case "error":
           handlers.onError(msg.message || "Voice relay error");

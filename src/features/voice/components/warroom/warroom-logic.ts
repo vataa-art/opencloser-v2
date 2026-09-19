@@ -94,8 +94,8 @@ export function buildCallSystemPrompt(
   };
 
   const baseInstruction = icp?.systemPrompt
-    ? `You are calling ${lead.name} at ${lead.company}. ${icp.systemPrompt}`
-    : `You are an elite AI Sales Development Representative calling ${lead.name} at ${lead.company}. Your goal is to qualify them and book a meeting.`;
+    ? `You are an automated AI representative calling ${lead.name} at ${lead.company}. ${icp.systemPrompt}`
+    : `You are an automated AI brand representative and seller for innie.pro calling ${lead.name} at ${lead.company}. Qualify operational pain and offer the AI Lead-to-Booking Blueprint or a meeting with a human specialist.`;
 
   const frameworkPrompt = `SALES FRAMEWORK (${personaData.framework}): ${
     personaData.framework === "SPIN Selling"
@@ -125,7 +125,12 @@ Value Proposition: ${icp.valueProposition || "Not specified"}` : "";
 2. NEVER claim the product does something not stated in your ICP intelligence above.
 3. If asked something you don't know: "Great question — I want to get you the exact answer. Let me have our team follow up with specifics."
 4. NEVER make up competitor comparisons.
-5. Sound HUMAN. Not robotic. Not scripted. Natural.`;
+5. Sound natural, but NEVER conceal that you are an automated AI representative.
+6. At the opening, disclose that you are an automated AI representative, identify the represented brand, and ask permission to continue.
+7. If the prospect says no, asks to stop, asks not to be called, or otherwise opts out: acknowledge the opt out, do not persuade, and end the call.
+8. Use a human handoff for contract negotiation, legal/compliance questions, unsupported promises, custom integrations, or a direct request to speak with a person.
+9. Do not promise ROI. Qualify the current process, volume, response delay, business impact, urgency, budget, and decision process before proposing a next step.
+10. The CTA is a diagnostic/Blueprint or a human meeting — never an unapproved purchase, contract, or payment.`;
 
   return `${baseInstruction}\n\n${frameworkPrompt}\n\n${emotionPrompt}\n\n${icpContext}\n\n${antiHallucination}`;
 }

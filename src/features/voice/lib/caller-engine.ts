@@ -13,14 +13,15 @@ import type { CallerEngine, EngineCallbacks } from "./adapters/base";
 import { GeminiCallerEngine } from "./adapters/gemini.adapter";
 import { OpenAICallerEngine } from "./adapters/openai.adapter";
 import { ElevenLabsCallerEngine } from "./adapters/elevenlabs.adapter";
+import { CartesiaCallerEngine } from "./adapters/cartesia.adapter";
 import { DemoCallerEngine } from "./adapters/demo.adapter";
 import { getProviderKey } from "../../../stores/keys.store";
 
 export type { CallState, TranscriptLine, EngineCallbacks } from "./adapters/base";
 export { CallerEngine } from "./adapters/base";
-export { GeminiCallerEngine, OpenAICallerEngine, ElevenLabsCallerEngine, DemoCallerEngine };
+export { GeminiCallerEngine, OpenAICallerEngine, ElevenLabsCallerEngine, CartesiaCallerEngine, DemoCallerEngine };
 
-export type VoiceProvider = "gemini" | "openai" | "elevenlabs";
+export type VoiceProvider = "gemini" | "openai" | "elevenlabs" | "cartesia";
 
 export async function createCallerEngine(
   provider: VoiceProvider,
@@ -39,6 +40,8 @@ export async function createCallerEngine(
       return new OpenAICallerEngine(callbacks);
     case "elevenlabs":
       return new ElevenLabsCallerEngine(callbacks);
+    case "cartesia":
+      return new CartesiaCallerEngine(callbacks);
     default:
       return new GeminiCallerEngine(callbacks);
   }

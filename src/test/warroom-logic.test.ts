@@ -100,11 +100,16 @@ describe("war room logic", () => {
     expect(prompt).toContain("SALES FRAMEWORK (SPIN Selling)");
     expect(prompt).toContain("Denied equipment claims");
     expect(prompt).toContain("NEVER fabricate statistics");
+    expect(prompt).toContain("automated AI representative");
+    expect(prompt).toContain("ask permission to continue");
+    expect(prompt).toContain("opt out");
+    expect(prompt).toContain("human handoff");
   });
 
   it("falls back to a default instruction when no ICP exists", () => {
     const prompt = buildCallSystemPrompt(persona({ framework: "Challenger Sale" }), null, null, lead);
-    expect(prompt).toContain("AI Sales Development Representative");
+    expect(prompt).toContain("automated AI brand representative and seller for innie.pro");
+    expect(prompt).toContain("AI Lead-to-Booking Blueprint");
     expect(prompt).toContain("SALES FRAMEWORK (Challenger Sale)");
     expect(prompt).not.toContain("ICP INTELLIGENCE");
   });

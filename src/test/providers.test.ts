@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { PROVIDERS, getProvider, getApiKey, hasApiKey } from "../features/voice/lib/providers";
 
 describe("providers", () => {
-  it("has three providers", () => {
-    expect(PROVIDERS).toHaveLength(3);
-    expect(PROVIDERS.map((p) => p.id)).toEqual(["gemini", "openai", "elevenlabs"]);
+  it("has four providers", () => {
+    expect(PROVIDERS).toHaveLength(4);
+    expect(PROVIDERS.map((p) => p.id)).toEqual(["gemini", "openai", "elevenlabs", "cartesia"]);
   });
 
   it("getProvider returns correct config", () => {
@@ -24,10 +24,21 @@ describe("providers", () => {
     expect(o.requiresRelay).toBe(true);
   });
 
-  it("elevenlabs has extra settings", () => {
-    const e = getProvider("elevenlabs");
-    expect(e.extraSettings).toBeDefined();
-    expect(e.extraSettings!.length).toBeGreaterThan(0);
+  it("uses current live provider models", () => {
+    expect(getProvider("gemini").model).toBe("gemini-3.8-live");
+    expect(getProvider("openai").model).toBe("gpt-realtime-2.1");
+  });
+
+  it("managed-agent providers expose agent ID settings", () => {
+    for (const id of ["elevenlabs", "cartesia"] as const) {
+      const provider = getProvider(id);
+      expect(provider.extraSettings).toBeDefined();
+      expect(provider.extraSettings!.some((setting) => setting.key === `${id}_agent_id`)).toBe(true);
+    }
+  });
+
+  it("uses Cartesia's current Sonic model", () => {
+    expect(getProvider("cartesia").model).toBe("sonic-3.5");
   });
 
   it("all providers have apiKeySettingKey", () => {

@@ -8,6 +8,17 @@ import { PROVIDERS } from "../../voice/lib/providers";
 import { DEEPGRAM_LANGUAGES, normalizeDeepgramLanguage } from "../../voice/lib/deepgram";
 import { useKeysStore } from "../../../stores/keys.store";
 
+const NON_SECRET_PROVIDER_SETTINGS = new Set(
+  PROVIDERS.flatMap(provider => provider.extraSettings?.map(setting => setting.key) ?? [])
+);
+
+function providerKeyPlaceholder(providerId: string): string {
+  if (providerId === "gemini") return "AIza...";
+  if (providerId === "cartesia") return "sk_car_...";
+  if (providerId === "elevenlabs") return "xi_...";
+  return "sk-...";
+}
+
 export function SettingsView() {
   // Audio devices
   const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
@@ -96,7 +107,7 @@ export function SettingsView() {
 
   const saveApiKey = (storageKey: string, value: string) => {
     setApiKeys(prev => ({ ...prev, [storageKey]: value }));
-    if (storageKey === "elevenlabs_agent_id") {
+    if (NON_SECRET_PROVIDER_SETTINGS.has(storageKey)) {
       localStorage.setItem(storageKey, value);
     } else {
       void useKeysStore.getState().setKey(storageKey, value);
@@ -196,7 +207,7 @@ export function SettingsView() {
                         value={apiKeys[provider.apiKeySettingKey] || ""}
                         onChange={e => setApiKeys(prev => ({ ...prev, [provider.apiKeySettingKey]: e.target.value }))}
                         onBlur={e => { if (e.target.value !== (apiKeys[provider.apiKeySettingKey] || '')) saveApiKey(provider.apiKeySettingKey, e.target.value); }}
-                        placeholder={`${provider.id === "gemini" ? "AIza..." : provider.id === "openai" ? "sk-..." : "xi_..."}`}
+                        placeholder={providerKeyPlaceholder(provider.id)}
                         className="w-full bg-surface-bg border border-surface-border rounded-xl px-4 py-3 text-sm font-mono text-ink focus:outline-none focus:border-coral/30 pr-10"
                       />
                       <button

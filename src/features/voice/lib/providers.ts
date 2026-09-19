@@ -8,7 +8,7 @@
 
 import { getStoredKey } from "../../../stores/keys.store";
 
-export type ProviderId = "gemini" | "openai" | "elevenlabs";
+export type ProviderId = "gemini" | "openai" | "elevenlabs" | "cartesia";
 
 export interface VoiceOption {
   id: string;
@@ -34,7 +34,7 @@ export const PROVIDERS: ProviderConfig[] = [
     id: "gemini",
     label: "Gemini Live",
     description: "Google's native real-time audio model. Sub-50ms end-to-end. Best multi-speaker, zero relay needed.",
-    model: "gemini-2.5-flash-native-audio-preview-09-2025",
+    model: "gemini-3.8-live",
     requiresRelay: false,
     apiKeyLabel: "Gemini API Key",
     apiKeySettingKey: "gemini_api_key",
@@ -50,8 +50,8 @@ export const PROVIDERS: ProviderConfig[] = [
   {
     id: "openai",
     label: "OpenAI Realtime",
-    description: "GPT-4o Realtime API with natural emotion and interruption handling. Requires server relay.",
-    model: "gpt-4o-realtime-preview",
+    description: "GPT Realtime API with natural emotion and interruption handling. Requires server relay.",
+    model: "gpt-realtime-2.1",
     requiresRelay: true,
     apiKeyLabel: "OpenAI API Key",
     apiKeySettingKey: "openai_api_key",
@@ -82,6 +82,21 @@ export const PROVIDERS: ProviderConfig[] = [
       { id: "ErXwobaYiN019PkySvjV", label: "Antoni", gender: "male", tone: "Friendly & Upbeat" },
       { id: "MF3mGyEYCl7XYWbV9V6O", label: "Elli", gender: "female", tone: "Bright & Clear" },
       { id: "TxGEqnHWrfWFTfGW9XjX", label: "Josh", gender: "male", tone: "Deep & Direct" },
+    ],
+  },
+  {
+    id: "cartesia",
+    label: "Cartesia Sonic",
+    description: "Cartesia Managed Agent with Sonic 3.5 voice, realtime turn-taking, transcripts, and barge-in.",
+    model: "sonic-3.5",
+    requiresRelay: true,
+    apiKeyLabel: "Cartesia API Key",
+    apiKeySettingKey: "cartesia_api_key",
+    extraSettings: [
+      { key: "cartesia_agent_id", label: "Managed Agent ID", placeholder: "agent_xxxxxxxxxxxx" },
+    ],
+    voices: [
+      { id: "managed", label: "Managed Agent Voice", gender: "neutral", tone: "Configured in Cartesia" },
     ],
   },
 ];

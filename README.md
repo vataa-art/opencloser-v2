@@ -23,7 +23,7 @@
 
 OpenCloser is an **open-source, AI-powered sales development platform** that runs entirely on your desktop. It gives you an **AI sales workbench**: a strategist to build your ICP, a demo lead generator (synthetic data), a voice caller to dial prospects, a coach to train your rebuttals, and a manager to analyze calls. No SaaS fees.
 
-> **Privacy note:** your CRM data lives locally, but **Live mode** sends prompts, transcripts, and audio to the AI providers you configure (Gemini / OpenAI / ElevenLabs / Deepgram). Demo mode does not contact any external service.
+> **Privacy note:** your CRM data lives locally, but **Live mode** sends prompts, transcripts, and audio to the AI providers you configure (Gemini / OpenAI / ElevenLabs / Cartesia / Deepgram). Demo mode does not contact any external service.
 
 | | Traditional Sales Team | **OpenCloser** |
 |---|---|---|
@@ -55,7 +55,7 @@ Generates your Ideal Customer Profile (ICP) using SPIN & Challenger frameworks. 
 Generates **fictional** demo leads for call rehearsal — it does not scrape websites or source real prospects (real sourcing is a roadmap item). Industry-aware demo mode with 5 keyword categories when no API key is configured. Full local-first CRM with Kanban pipeline management.
 
 ### 📞 AI Caller (SDR)
-Real-time AI voice agent (Gemini / OpenAI Realtime / ElevenLabs) over a **virtual audio cable** (VB-Cable / BlackHole) — not a PSTN dialer. Live transcription and phrase-map objection hints. Sequential “power dial” queue through Outbound Call leads (one at a time). Live mode sends audio/transcripts to your chosen providers.
+Real-time AI voice agent (Gemini / OpenAI Realtime / ElevenLabs / Cartesia Sonic) over a **virtual audio cable** (VB-Cable / BlackHole) — not a PSTN dialer. Live transcription and phrase-map objection hints. Sequential “power dial” queue through Outbound Call leads (one at a time). Live mode sends audio/transcripts to your chosen providers.
 
 ### 🎯 AI Sales Coach
 Objection sparring trainer with 3 difficulty levels (Rookie, Pro, Elite). Practice handling 12 objection archetypes against an AI prospect. Real-time encouragement and post-session scoring with specific improvement tips.
@@ -95,6 +95,7 @@ Add any of these in Settings → Voice Engine:
 | Google Gemini | `GEMINI_API_KEY` for onboarding, lead hunting, call analysis |
 | OpenAI Realtime | `openai_api_key` for voice calling through the built-in relay |
 | ElevenLabs ConvAI | `elevenlabs_api_key` + Agent ID for the most human-like voice |
+| Cartesia Managed Agent | `cartesia_api_key` + published Agent ID for Sonic 3.5 voice calling ([setup](docs/CARTESIA_INNIE_AGENT.md)) |
 | Deepgram STT | `deepgram_api_key` for live Ukrainian (`uk`) or English (`en-US`) transcription |
 
 ---
@@ -111,7 +112,7 @@ opencloser/
 │   │   └── onboarding/         # AI onboarding + ICP generation
 │   ├── stores/                 # Zustand stores (lead, call, keys, etc.)
 │   ├── services/               # Typed Tauri invoke wrappers + secure key storage
-│   ├── voice/lib/adapters/     # Per-provider protocol handlers (Gemini/OpenAI/ElevenLabs/Demo)
+│   ├── voice/lib/adapters/     # Per-provider protocol handlers (Gemini/OpenAI/ElevenLabs/Cartesia/Demo)
 │   ├── test/                   # Vitest contract + unit tests
 │   └── components/             # AppShell, shared UI
 ├── src-tauri/                  # Rust backend

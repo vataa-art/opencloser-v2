@@ -15,6 +15,7 @@ export const SECRET_KEYS = [
   "gemini_api_key",
   "openai_api_key",
   "elevenlabs_api_key",
+  "cartesia_api_key",
   "deepgram_api_key",
 ] as const;
 
