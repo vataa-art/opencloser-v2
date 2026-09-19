@@ -11,20 +11,32 @@ use serde_json::{json, Value};
 use std::env;
 use tauri::{AppHandle, Manager};
 
-/// Directory scanned at startup for seed documents. Dev builds resolve the
-/// repo-relative `knowledge/` folder; packaged builds simply log that no
-/// seed source exists (seeding is best-effort and never fatal).
+/// Recruitment knowledge directory (`knowledge/recruitment`) scanned at
+/// startup for seed documents: `transcripts/*.txt` plus `courses.json`.
+/// Resolution order: the `OPENCLOSER_KB_DIR` override, the repo checkout
+/// next to `src-tauri/`, then the legacy pack-root layout. Packaged builds
+/// simply log that no seed source exists (seeding is best-effort and never
+/// fatal). Each source (transcripts, courses) is seeded independently, so a
+/// checkout that ships only the JSON content pack still seeds the catalog.
 fn seed_dir() -> Option<PathBuf> {
     if let Ok(dir) = env::var("OPENCLOSER_KB_DIR") {
         let p = PathBuf::from(dir);
-        return p.is_dir().then_some(p);
+        // Accept both the recruitment knowledge dir and (for older
+        // setups) a direct transcripts path.
+        let resolved = if p.join("transcripts").is_dir() {
+            p
+        } else {
+            p.join("..")
+        };
+        return resolved.canonicalize().ok().filter(|c| c.is_dir());
     }
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let repo_knowledge = manifest
-        .join("../../knowledge/recruitment/transcripts")
-        .canonicalize()
-        .ok();
-    repo_knowledge.filter(|p| p.is_dir())
+    [
+        manifest.join("../knowledge/recruitment"),    // repo checkout
+        manifest.join("../../knowledge/recruitment"), // legacy pack-root layout
+    ]
+    .iter()
+    .find_map(|p| p.canonicalize().ok().filter(|c| c.is_dir()))
 }
 
 fn open_db(app: &AppHandle) -> Result<Connection, String> {
@@ -410,7 +422,7 @@ pub fn seed_if_empty(conn: &Connection) -> usize {
     let mut ingested = 0usize;
 
     // 1. Transcripts: knowledge/recruitment/transcripts/*.txt
-    let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(dir.join("transcripts"))
         .map(|rd| {
             rd.filter_map(|e| e.ok())
                 .map(|e| e.path())
@@ -435,11 +447,8 @@ pub fn seed_if_empty(conn: &Connection) -> usize {
     }
 
     // 2. Course catalog: knowledge/recruitment/courses.json
-    if let Some(courses_path) = dir
-        .parent()
-        .map(|p| p.join("courses.json"))
-        .filter(|p| p.is_file())
-    {
+    let courses_path = dir.join("courses.json");
+    if courses_path.is_file() {
         match std::fs::read_to_string(&courses_path).map_err(|e| e.to_string()).and_then(|s| serde_json::from_str::<Value>(&s).map_err(|e| e.to_string())) {
             Ok(catalog) => {
                 for course in catalog["courses"].as_array().map(|a| a.as_slice()).unwrap_or(&[]) {

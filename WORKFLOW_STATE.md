@@ -1,8 +1,8 @@
 # WORKFLOW_STATE — OpenCloser v2
 
-**Iteration:** 0 (pack + handoff + subagent bootstrap)  
-**Updated:** 2026-09-16 23:10 EEST  
-**Status:** packaging in progress; coding cycle not started
+**Iteration:** audit-fix round 3 (Hoplite)  
+**Updated:** 2026-09-18  
+**Status:** iter-1..6 hiring/sales verticals committed; audit + production fixes done this round (see PRODUCTION_AUDIT.md)
 
 ## Source identity
 
@@ -34,16 +34,11 @@ Untracked:
 
 - `src/features/recruitment/` (`RecruitmentKnowledgeView.tsx` + Recruitment Academy nav)
 
-## Plan for iteration 1 (after pack is verified)
+## Plan for the next coding session
 
-1. Supervisor читає цей файл + `GOAL.md` + `HANDOFF.md`.
-2. Preflight OpenCode: version, auth, exact model IDs (Union Alpha / Big Pickle / Grok 4.6). Якщо ID немає — стоп.
-3. Implementor (Union Alpha) **один** owner на `project/`:
-   - довести Recruitment Academy до компіляції/тестів;
-   - не чіпати voice relay secrets;
-   - не комітити `.env`.
-4. Tester запускає `npm run lint && npm test && npm run build` у `project/` (venv isolation: `unset PYTHONPATH PYTHONHOME VIRTUAL_ENV` не потрібен для npm, але не запускати через Hermes python).
-5. Critic (Grok 4.6) оцінює diff + тести. FAIL → новий план, iter+1. OK → commit `iter-N: …`.
+1. Hiring iter-6 (ScreeningRoom) з `docs/P1-RECRUITMENT-HIRING.md` §9 — або повернути transcripts-корпус у git (найменший хід, див. PRODUCTION_AUDIT.md).
+2. Гейти незмінні: `npm run lint && npm test && npm run build`; Rust — `cargo test -p kb-core -p hiring-core` + `cargo check`.
+3. Один writer на shared tree; Critic оцінює diff. FAIL → новий план. OK → commit.
 
 ## Parallelism rule
 
@@ -51,9 +46,9 @@ Untracked:
 
 ## Blockers
 
-- OpenCode CLI (`opencode`) **не знайдений** на PATH під час bootstrap (`hermes` і `grok` є). Preflight-субагент перевіряє глибше. Поки CLI не підтверджений — implementor JSON є **draft**.
-- `bin/OpenCloser.exe` (2026-08-28, 33.6 MB) **не** відповідає dirty tree 2026-09-16.
-- Customer-release P0 (MSVC installer, live API E2E) лишаються відкритими — не в цій ітерації.
+- Transcripts-корпус (`knowledge/recruitment/transcripts/`) існує лише на Windows-хості, не в git — KB сіється тільки курсами, acceptance-тест скіпається.
+- Customer-release P0: MSVC installer, live API E2E, code signing — відкриті.
+- `bin/OpenCloser.exe` (2026-08-28) не відповідає поточному дереву.
 
 ## Next decision for supervisor
 

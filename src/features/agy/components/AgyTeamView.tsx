@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Bot, CheckCircle2, Clock3, Loader2, Play, ShieldCheck, XCircle } from "lucide-react";
+import { Bot, CheckCircle2, Clock3, Loader2, Play, ShieldCheck, Square, XCircle } from "lucide-react";
 
 type AgyAgent = {
   id: string;
@@ -34,6 +34,7 @@ export function AgyTeamView() {
   const [job, setJob] = useState<AgyJob | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -70,6 +71,19 @@ export function AgyTeamView() {
       setError(String(err));
     } finally {
       setStarting(false);
+    }
+  };
+
+  const cancel = async () => {
+    if (!job || cancelling) return;
+    setCancelling(true);
+    setError("");
+    try {
+      await invoke("cancel_agy_agent", { jobId: job.id });
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -140,6 +154,17 @@ export function AgyTeamView() {
               {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
               Запустити AGY worker
             </button>
+            {(job?.status === "queued" || job?.status === "running") && (
+              <button
+                type="button"
+                onClick={() => void cancel()}
+                disabled={cancelling}
+                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Square className="w-4 h-4" />}
+                Зупинити worker
+              </button>
+            )}
             {error && <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
           </section>
 

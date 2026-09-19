@@ -12,23 +12,6 @@ export const STORAGE_KEYS = {
   PREFERRED_SPEAKER: "preferredSpeakerId",
 } as const;
 
-export const ROUTES = {
-  ONBOARDING: "onboarding",
-  ICP_REVIEW: "icp_review",
-  AUDIO_SETUP: "audio_setup",
-  PERSONA_SETUP: "persona_setup",
-  HOME: "home",
-  DASHBOARD: "dashboard",
-  HUNTER: "hunter",
-  CALL_LOGS: "call_logs",
-  SETTINGS: "settings",
-  PERSONA: "persona",
-  LEAD_DETAIL: "lead_detail",
-  TRAINER: "trainer",
-  RECRUITMENT: "recruitment",
-  COPILOT: "copilot",
-} as const;
-
 export const LEAD_STATUSES = ["Discovery", "Outbound Call", "Audit Requested", "Closed"] as const;
 
 export const NAV_ITEMS = [

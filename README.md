@@ -223,7 +223,11 @@ is configured).
   course transcripts (`transcripts/*.txt`) and the course catalog
   (`courses.json`) — into the `kb_chunks` table (schema v7, `domain="recruitment"`).
   Seeding is idempotent per source: drop new `.txt` transcripts or extend
-  `courses.json` and they are picked up on the next launch.
+  `courses.json` and they are picked up on the next launch. The two sources
+  seed independently: the transcript corpus is a local content pack that is
+  **not committed to the repository**, so a fresh checkout seeds the course
+  catalog, and the `kb-core` acceptance test skips until the corpus is
+  restored into `knowledge/recruitment/transcripts/`.
 - **Commands (Tauri):**
   | Command | Purpose |
   |---|---|
