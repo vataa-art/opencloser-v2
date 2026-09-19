@@ -60,7 +60,7 @@ export const RECRUITMENT_COURSES: RecruitmentCourse[] = [
   },
   {
     id: "juhas-linkedin",
-    title: "Recruit on LinkedIn — Live Session Replays",
+    title: "Recruit on LinkedIn (screen-share session replays)",
     publisher: "AI with Michal Juhas",
     channel_url: "https://www.youtube.com/@michal-juhas",
     url: "https://www.youtube.com/playlist?list=PLokCw8elrMIRV8Ee6aauJyPrn1QCerqd5",
@@ -105,7 +105,7 @@ export const RECRUITMENT_COURSES: RecruitmentCourse[] = [
   },
   {
     id: "skilldeck-hr",
-    title: "SkillDeck — KPI · Manpower Planning · Sourcing · Compliance",
+    title: "SkillDeck HR/Recruitment playlists (KPI, Manpower Planning, Social Media Sourcing, HR Compliance)",
     publisher: "SkillDeck",
     channel_url: "https://www.youtube.com/channel/UCKKpG41M4yHhV3z0WL8wEzw",
     url: "https://www.youtube.com/channel/UCKKpG41M4yHhV3z0WL8wEzw/playlists",

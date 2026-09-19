@@ -1,9 +1,9 @@
 import React from "react";
 import {
-  Phone, Search, Settings, Plus, LayoutDashboard,
-  Target, Bot, Home, Swords, Zap, Bell, ChevronDown, GraduationCap,
+  Phone, Search, Plus, Home, Zap, Bell, ChevronDown,
 } from "lucide-react";
 import { APP_TITLE, NAV_ITEMS, SIDEBAR_TOP, SIDEBAR_BOTTOM } from "../constants";
+import { SIDEBAR_ICON_MAP } from "./sidebarIcons";
 import type { AppPage } from "../stores/navigation.store";
 
 interface AppShellProps {
@@ -15,10 +15,6 @@ interface AppShellProps {
   onStopPowerDial: () => void;
   children: React.ReactNode;
 }
-
-const SIDEBAR_ICONS: Record<string, React.FC<{ className?: string }>> = {
-  Home, LayoutDashboard, Phone, Target, Bot, Swords, Settings, GraduationCap,
-};
 
 export function AppShell({
   currentPage, isPowerDialing, isDemoMode,
@@ -87,7 +83,7 @@ export function AppShell({
         <aside className="flex flex-col items-center gap-4 py-8 shrink-0 relative z-40 bg-transparent" style={{ width: 80 }}>
           <div className="flex flex-col items-center gap-3 flex-1 px-4">
             {SIDEBAR_TOP.map((item) => {
-              const Icon = SIDEBAR_ICONS[item.icon];
+              const Icon = SIDEBAR_ICON_MAP[item.icon] ?? Home;
               return (
                 <button key={item.state} title={item.label} onClick={() => onNavigate(item.state as AppPage)}
                   className={`w-12 h-12 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
@@ -105,7 +101,7 @@ export function AppShell({
               <Plus className="w-6 h-6 stroke-[3px]" />
             </button>
             {SIDEBAR_BOTTOM.map((item) => {
-              const Icon = SIDEBAR_ICONS[item.icon];
+              const Icon = SIDEBAR_ICON_MAP[item.icon] ?? Home;
               return (
                 <button key={item.state} title={item.label} onClick={() => onNavigate(item.state as AppPage)}
                   className={`w-12 h-12 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${

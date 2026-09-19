@@ -3,24 +3,9 @@
 // New Campaign quick-add and settings entry.
 // ============================================================
 
-import { Bot, Briefcase, GraduationCap, Home, LayoutDashboard, Phone, Plus, Settings, Swords, Target, Zap, AudioLines } from "lucide-react";
-
-const SIDEBAR_TOP = [
-  { icon: Home, state: "home", label: "Overview" },
-  { icon: LayoutDashboard, state: "dashboard", label: "Pipeline" },
-  { icon: Phone, state: "call_logs", label: "Call Intelligence" },
-  { icon: Target, state: "hunter", label: "Lead Researcher" },
-  { icon: Bot, state: "persona", label: "AI Caller" },
-  { icon: Zap, state: "agy", label: "AGY Agents" },
-  { icon: Swords, state: "trainer", label: "Sales Coach" },
-  { icon: GraduationCap, state: "recruitment", label: "Recruitment Academy" },
-  { icon: Briefcase, state: "hiring", label: "Hiring" },
-  { icon: AudioLines, state: "copilot", label: "Live Copilot" },
-];
-
-const SIDEBAR_BOTTOM = [
-  { icon: Settings, state: "settings", label: "Settings" },
-];
+import { Home, Plus } from "lucide-react";
+import { SIDEBAR_BOTTOM, SIDEBAR_TOP } from "../../../../constants";
+import { SIDEBAR_ICON_MAP } from "../../../../components/sidebarIcons";
 
 interface AppSidebarProps {
   activeState: string;
@@ -35,20 +20,23 @@ export function AppSidebar({ activeState, onNavigate }: AppSidebarProps) {
     >
       {/* Top icons */}
       <div className="flex flex-col items-center gap-3 flex-1 px-4">
-        {SIDEBAR_TOP.map((item) => (
-          <button
-            key={item.state}
-            title={item.label}
-            onClick={() => onNavigate(item.state)}
-            className={`w-12 h-12 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
-              (activeState === item.state || (item.state === "dashboard" && activeState === "lead_detail"))
-                ? "bg-gray-200 text-gray-900 shadow-sm"
-                : "text-gray-400 hover:bg-gray-200 hover:text-gray-700 bg-transparent"
-            }`}
-          >
-            <item.icon className="w-5 h-5 stroke-[2.5px]" />
-          </button>
-        ))}
+        {SIDEBAR_TOP.map((item) => {
+          const Icon = SIDEBAR_ICON_MAP[item.icon] ?? Home;
+          return (
+            <button
+              key={item.state}
+              title={item.label}
+              onClick={() => onNavigate(item.state)}
+              className={`w-12 h-12 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
+                (activeState === item.state || (item.state === "dashboard" && activeState === "lead_detail"))
+                  ? "bg-gray-200 text-gray-900 shadow-sm"
+                  : "text-gray-400 hover:bg-gray-200 hover:text-gray-700 bg-transparent"
+              }`}
+            >
+              <Icon className="w-5 h-5 stroke-[2.5px]" />
+            </button>
+          );
+        })}
       </div>
 
       {/* Bottom icons */}
@@ -61,20 +49,23 @@ export function AppSidebar({ activeState, onNavigate }: AppSidebarProps) {
         >
           <Plus className="w-6 h-6 stroke-[3px]" />
         </button>
-        {SIDEBAR_BOTTOM.map((item) => (
-          <button
-            key={item.state}
-            title={item.label}
-            onClick={() => onNavigate(item.state)}
-            className={`w-12 h-12 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
-              activeState === item.state
-                ? "bg-gray-200 text-gray-900"
-                : "text-gray-400 hover:bg-gray-200 hover:text-gray-700 bg-transparent"
-            }`}
-          >
-            <item.icon className="w-5 h-5 stroke-[2.5px]" />
-          </button>
-        ))}
+        {SIDEBAR_BOTTOM.map((item) => {
+          const Icon = SIDEBAR_ICON_MAP[item.icon] ?? Home;
+          return (
+            <button
+              key={item.state}
+              title={item.label}
+              onClick={() => onNavigate(item.state)}
+              className={`w-12 h-12 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
+                activeState === item.state
+                  ? "bg-gray-200 text-gray-900"
+                  : "text-gray-400 hover:bg-gray-200 hover:text-gray-700 bg-transparent"
+              }`}
+            >
+              <Icon className="w-5 h-5 stroke-[2.5px]" />
+            </button>
+          );
+        })}
       </div>
     </aside>
   );

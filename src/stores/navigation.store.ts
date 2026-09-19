@@ -11,6 +11,7 @@ export type AppPage =
   | "call_logs"
   | "settings"
   | "persona"
+  | "agy"
   | "lead_detail"
   | "trainer"
   | "recruitment"

@@ -27,6 +27,7 @@ export const SIDEBAR_TOP = [
   { icon: "Phone", state: "call_logs", label: "Call Intelligence" },
   { icon: "Target", state: "hunter", label: "Lead Researcher" },
   { icon: "Bot", state: "persona", label: "AI Caller" },
+  { icon: "Zap", state: "agy", label: "AGY Agents" },
   { icon: "Swords", state: "trainer", label: "Sales Coach" },
   { icon: "GraduationCap", state: "recruitment", label: "Recruitment Academy" },
   { icon: "Briefcase", state: "hiring", label: "Hiring" },
