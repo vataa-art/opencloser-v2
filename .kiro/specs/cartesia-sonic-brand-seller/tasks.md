@@ -8,4 +8,4 @@
 - [x] Add innie.pro disclosure, qualification, opt-out and handoff policy.
 - [x] Add Cartesia dashboard/setup and sandbox QA documentation.
 - [x] Run frontend tests, typecheck, production build and Rust tests.
-- [ ] Update graphify and record QA evidence.
+- [x] Update graphify and record QA evidence.
