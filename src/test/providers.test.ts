@@ -38,7 +38,7 @@ describe("providers", () => {
   });
 
   it("uses Cartesia's current Sonic model", () => {
-    expect(getProvider("cartesia").model).toBe("sonic-3.5");
+    expect(getProvider("cartesia").model).toBe("sonic-3.6");
   });
 
   it("all providers have apiKeySettingKey", () => {

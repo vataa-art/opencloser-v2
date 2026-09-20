@@ -95,7 +95,7 @@ Add any of these in Settings → Voice Engine:
 | Google Gemini | `GEMINI_API_KEY` for onboarding, lead hunting, call analysis |
 | OpenAI Realtime | `openai_api_key` for voice calling through the built-in relay |
 | ElevenLabs ConvAI | `elevenlabs_api_key` + Agent ID for the most human-like voice |
-| Cartesia Managed Agent | `cartesia_api_key` + published Agent ID for Sonic 3.5 voice calling ([setup](docs/CARTESIA_INNIE_AGENT.md)) |
+| Cartesia Managed Agent | `cartesia_api_key` + published Agent ID for Sonic 3.6 voice calling ([setup](docs/CARTESIA_INNIE_AGENT.md)) |
 | Deepgram STT | `deepgram_api_key` for live Ukrainian (`uk`) or English (`en-US`) transcription |
 
 ---

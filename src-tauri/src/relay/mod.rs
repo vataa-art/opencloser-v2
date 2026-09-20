@@ -3,8 +3,8 @@
 //! Security model:
 //! - listens on 127.0.0.1 with a per-launch random token; every client must
 //!   present the token as `token` in its first (config) message;
-//! - provider credentials stay in the backend process — only the config
-//!   message travels over the loopback socket;
+//! - provider credentials are loaded from the OS keychain and sent only over
+//!   the authenticated loopback socket, never in a URL or remote WebView;
 //! - `ready` is sent only after the provider session is confirmed, not right
 //!   after the socket opens;
 //! - provider protocols are translated into the client's internal event
@@ -118,7 +118,7 @@ async fn handle_connection(stream: TcpStream, expected_token: String) {
         Err(e) => {
             let _ = client_tx
                 .send(Message::Text(
-                    format!(r#"{{"type":"error","message":"{}"}}"#, e).into(),
+                    serde_json::json!({ "type": "error", "message": e }).to_string(),
                 ))
                 .await;
             return;
@@ -245,12 +245,14 @@ async fn handle_connection(stream: TcpStream, expected_token: String) {
 }
 
 fn provider_session_ready(provider: &str, text: &str) -> bool {
+    if provider == "cartesia" {
+        return relay_protocol::cartesia_session_ready(text);
+    }
     let parsed: Result<Value, _> = serde_json::from_str(text);
     let Ok(v) = parsed else { return false };
     match provider {
         "openai" => v["type"] == "session.updated",
         "elevenlabs" => v["type"] == "conversation_initiation_metadata",
-        "cartesia" => v["type"] == "session_ready",
         // Deepgram: any JSON frame implies the socket is live.
         "deepgram" => true,
         _ => false,
@@ -275,19 +277,23 @@ fn adapt_client_audio(provider: &str, pcm: &[u8]) -> Message {
             })
             .to_string(),
         ),
-        "cartesia" => Message::Text(
-            serde_json::json!({
-                "type": "audio_input",
-                "audio": engine.encode(pcm),
-            })
-            .to_string(),
-        ),
+        "cartesia" => Message::Text(relay_protocol::adapt_cartesia_client_audio(pcm)),
         _ => Message::Binary(pcm.to_vec()),
     }
 }
 
 /// Translate a provider JSON event into the client's internal event format.
 fn translate_provider_text(provider: &str, text: &str) -> Vec<Message> {
+    if provider == "cartesia" {
+        return relay_protocol::translate_cartesia_provider_text(text)
+            .into_iter()
+            .map(|frame| match frame {
+                relay_protocol::RelayFrame::Text(text) => Message::Text(text),
+                relay_protocol::RelayFrame::Binary(data) => Message::Binary(data),
+            })
+            .collect();
+    }
+
     let parsed: Result<Value, _> = serde_json::from_str(text);
     let Ok(v) = parsed else {
         return vec![Message::Text(text.into())];
@@ -330,46 +336,6 @@ fn translate_provider_text(provider: &str, text: &str) -> Vec<Message> {
                 .as_str()
                 .unwrap_or(""),
         ),
-        ("cartesia", "audio_output") => v["audio"]
-            .as_str()
-            .and_then(|b64| engine.decode(b64).ok())
-            .map(|pcm| vec![Message::Binary(pcm)])
-            .unwrap_or_default(),
-        ("cartesia", "audio_output_clear") => {
-            vec![Message::Text(r#"{"type":"interrupted"}"#.into())]
-        }
-        ("cartesia", "turn_ended") => {
-            let kind = match v["role"].as_str().unwrap_or("") {
-                "assistant" => "transcript.model",
-                "user" => "transcript.user",
-                _ => return Vec::new(),
-            };
-            text_event(kind, v["text"].as_str().unwrap_or(""))
-        }
-        ("cartesia", "client_tool_call") => {
-            if v["tool_name"] != "request_human_handoff" {
-                return Vec::new();
-            }
-            let reason = v["parameters"]["reason"]
-                .as_str()
-                .unwrap_or("Prospect requested a human");
-            vec![Message::Text(
-                serde_json::json!({
-                    "type": "handoff.requested",
-                    "toolCallId": v["tool_call_id"].as_str().unwrap_or(""),
-                    "reason": reason,
-                    "expectsResponse": v["expects_response"].as_bool().unwrap_or(false),
-                })
-                .to_string(),
-            )]
-        }
-        ("cartesia", "error") => vec![Message::Text(
-            serde_json::json!({
-                "type": "error",
-                "message": v["message"].as_str().unwrap_or("Cartesia agent error"),
-            })
-            .to_string(),
-        )],
         ("deepgram", "Results") => {
             let is_final = v["is_final"].as_bool().unwrap_or(false);
             let transcript = v["channel"]["alternatives"][0]["transcript"]
@@ -514,7 +480,7 @@ async fn connect_cartesia(
     config: &Value,
 ) -> Result<(ProviderWs, Option<Value>), String> {
     let agent_id = config["agentId"].as_str().unwrap_or("").trim();
-    if !is_safe_cartesia_agent_id(agent_id) {
+    if !relay_protocol::is_safe_cartesia_agent_id(agent_id) {
         return Err(
             "Cartesia agentId is required and must use only letters, digits, '_' or '-'".into(),
         );
@@ -537,30 +503,10 @@ async fn connect_cartesia(
         .await
         .map_err(|e| format!("Cartesia connection failed: {}", e))?;
 
-    Ok((provider_ws, Some(cartesia_session_payload(config))))
-}
-
-fn is_safe_cartesia_agent_id(agent_id: &str) -> bool {
-    !agent_id.is_empty()
-        && agent_id
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
-}
-
-fn cartesia_session_payload(config: &Value) -> Value {
-    let system_prompt = config["systemPrompt"].as_str().unwrap_or("");
-    let language = config["language"].as_str().unwrap_or("en-US");
-    serde_json::json!({
-        "type": "session_create",
-        "audio": {
-            "input_format": "pcm_16000",
-            "output_delivery": "speaking_pace"
-        },
-        "dynamic_variables": {
-            "opencloser_context": system_prompt,
-            "opencloser_language": language
-        }
-    })
+    Ok((
+        provider_ws,
+        Some(relay_protocol::cartesia_session_payload(config)),
+    ))
 }
 
 #[cfg(test)]
@@ -747,7 +693,7 @@ mod tests {
 
     #[test]
     fn cartesia_session_payload_uses_pcm16_and_opencloser_context() {
-        let payload = cartesia_session_payload(&serde_json::json!({
+        let payload = relay_protocol::cartesia_session_payload(&serde_json::json!({
             "systemPrompt": "Represent innie.pro safely",
             "language": "uk"
         }));
@@ -759,8 +705,8 @@ mod tests {
             "Represent innie.pro safely"
         );
         assert_eq!(payload["dynamic_variables"]["opencloser_language"], "uk");
-        assert!(is_safe_cartesia_agent_id("agent_test-123"));
-        assert!(!is_safe_cartesia_agent_id("../bad"));
+        assert!(relay_protocol::is_safe_cartesia_agent_id("agent_test-123"));
+        assert!(!relay_protocol::is_safe_cartesia_agent_id("../bad"));
     }
 
     #[test]

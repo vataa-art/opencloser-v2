@@ -87,8 +87,8 @@ export const PROVIDERS: ProviderConfig[] = [
   {
     id: "cartesia",
     label: "Cartesia Sonic",
-    description: "Cartesia Managed Agent with Sonic 3.5 voice, realtime turn-taking, transcripts, and barge-in.",
-    model: "sonic-3.5",
+    description: "Cartesia Managed Agent with Sonic 3.6 voice, realtime turn-taking, transcripts, and barge-in.",
+    model: "sonic-3.6",
     requiresRelay: true,
     apiKeyLabel: "Cartesia API Key",
     apiKeySettingKey: "cartesia_api_key",

@@ -1,6 +1,6 @@
 # Cartesia Sonic innie.pro brand seller
 
-OpenCloser now supports Cartesia Managed Agents as a realtime voice provider. Cartesia supplies the managed conversation pipeline and Sonic 3.5 voice; OpenCloser supplies lead context, manual call control, audio routing, transcript logging, QA, and a human-handoff audit event.
+OpenCloser now supports Cartesia Managed Agents as a realtime voice provider. Cartesia supplies the managed conversation pipeline and Sonic 3.6 voice; OpenCloser supplies lead context, manual call control, audio routing, transcript logging, QA, and a human-handoff audit event.
 
 ## Safety boundary
 
@@ -10,10 +10,14 @@ OpenCloser now supports Cartesia Managed Agents as a realtime voice provider. Ca
 - An opt-out ends the sales conversation immediately.
 - ROI, case studies, capabilities, availability, prices, discounts, and contract terms may only be stated when supplied in approved context.
 
+## OpenCloser calling path
+
+The current outbound path remains human-started: OpenCloser opens the lead's number through its **Phone Link** (`tel:`) action and runs the Cartesia agent through the War Room's selected microphone/speaker routing. Validate that routing with a controlled test lead before customer use. This integration does not claim an autonomous power dialer or a native Cartesia `/agents/calls` campaign queue.
+
 ## Cartesia setup
 
 1. In Cartesia, create a **Managed Agent**.
-2. Select a Sonic 3.5 voice that is licensed for the account. Do not paste an invented voice UUID.
+2. Select a Sonic 3.6 voice that is licensed for the account. Do not paste an invented voice UUID.
 3. Configure the agent's LLM and turn-taking in Cartesia.
 4. Paste the system prompt below.
 5. Add a client tool named `request_human_handoff`:
@@ -25,6 +29,7 @@ OpenCloser now supports Cartesia Managed Agents as a realtime voice provider. Ca
    - save the Cartesia API key (stored in the OS keychain);
    - save the Cartesia Managed Agent ID (non-secret local setting).
 9. In AI Persona, select **Cartesia Sonic**. The voice selector says **Managed Agent Voice** because the actual voice is controlled by Cartesia.
+10. In War Room, keep **Phone Link** enabled and select the audio devices that bridge the phone application and the agent.
 
 ## Managed Agent system prompt
 

@@ -74,6 +74,7 @@ export function WarRoom({ lead, icp, onClose }: WarRoomProps) {
   const playbackQueueRef = useRef<Float32Array[]>([]);
   const playbackQueueIndexRef = useRef(0);
   const nextPlayTimeRef = useRef(0);
+  const playbackSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
 
   // Engine
   const engineRef = useRef<CallerEngine | null>(null);
@@ -83,6 +84,20 @@ export function WarRoom({ lead, icp, onClose }: WarRoomProps) {
   const startTimeRef = useRef(Date.now());
   const timeoutIdsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
+
+  const stopPlayback = useCallback(() => {
+    playbackSourcesRef.current.forEach((source) => {
+      try {
+        source.stop();
+      } catch {
+        // A source that already ended cannot be stopped again.
+      }
+    });
+    playbackSourcesRef.current.clear();
+    playbackQueueRef.current = [];
+    playbackQueueIndexRef.current = 0;
+    nextPlayTimeRef.current = audioContextRef.current?.currentTime ?? 0;
+  }, []);
 
   const safeSetTimeout = (fn: () => void, ms: number) => {
     const id = setTimeout(fn, ms);
@@ -117,11 +132,12 @@ export function WarRoom({ lead, icp, onClose }: WarRoomProps) {
       scriptProcessorRef.current?.disconnect();
       sourceRef.current?.disconnect();
       mediaStreamRef.current?.getTracks().forEach(t => t.stop());
+      stopPlayback();
       if (audioContextRef.current?.state !== "closed") audioContextRef.current?.close();
       engineRef.current?.disconnect();
       deepgramRef.current?.disconnect();
     };
-  }, []);
+  }, [stopPlayback]);
 
   // Timer
   useEffect(() => {
@@ -353,8 +369,7 @@ export function WarRoom({ lead, icp, onClose }: WarRoomProps) {
           });
         },
         onInterrupted: () => {
-          playbackQueueRef.current = [];
-          playbackQueueIndexRef.current = 0;
+          stopPlayback();
         },
         onHandoffRequested: (reason) => {
           setCallState("closing");
@@ -428,6 +443,8 @@ export function WarRoom({ lead, icp, onClose }: WarRoomProps) {
       const src = ac.createBufferSource();
       src.buffer = buf;
       src.connect(outAnalyser || ac.destination);
+      playbackSourcesRef.current.add(src);
+      src.onended = () => playbackSourcesRef.current.delete(src);
       src.start(nextPlayTimeRef.current);
       nextPlayTimeRef.current += buf.duration;
     }
@@ -442,6 +459,7 @@ export function WarRoom({ lead, icp, onClose }: WarRoomProps) {
     scriptProcessorRef.current?.disconnect();
     sourceRef.current?.disconnect();
     mediaStreamRef.current?.getTracks().forEach(t => t.stop());
+    stopPlayback();
     if (audioContextRef.current?.state !== "closed") audioContextRef.current?.close();
     engineRef.current?.disconnect();
     deepgramRef.current?.disconnect();
@@ -461,7 +479,7 @@ export function WarRoom({ lead, icp, onClose }: WarRoomProps) {
     }).catch(console.error);
 
     onClose(t, durationSeconds);
-  }, [lead.id, onClose]);
+  }, [lead.id, onClose, stopPlayback]);
 
   const toggleMute = useCallback(() => {
     const next = !isMutedRef.current;

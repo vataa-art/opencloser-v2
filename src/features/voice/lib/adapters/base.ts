@@ -118,9 +118,9 @@ export interface RelayConnection {
 }
 
 /**
- * Open a WebSocket to the loopback voice relay. The API key is sent only in
- * the adapter's config frame — never in a URL — and the per-launch token
- * gates the socket against other local processes.
+ * Open a WebSocket to the loopback voice relay. The keychain-backed API key is
+ * sent only in the adapter's config frame — never in a URL or remote origin —
+ * and the per-launch token gates the socket against other local processes.
  */
 export async function openRelayConnection(provider: string): Promise<RelayConnection> {
   const port: number = await invoke("get_relay_port");

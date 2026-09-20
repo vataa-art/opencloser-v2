@@ -1,7 +1,7 @@
 # Requirements — Cartesia Sonic brand seller
 
 ## Goal
-Add Cartesia Managed Agents (Sonic 3.5 voice pipeline) as a first-class OpenCloser voice provider so a manually approved OpenCloser call can use an innie.pro brand representative and sales agent.
+Add Cartesia Managed Agents (current Sonic 3.6 voice pipeline) as a first-class OpenCloser voice provider so a manually approved OpenCloser call can use an innie.pro brand representative and sales agent.
 
 ## Functional requirements
 
@@ -24,7 +24,7 @@ Add Cartesia Managed Agents (Sonic 3.5 voice pipeline) as a first-class OpenClos
    - Opt-out, human request, legal/compliance uncertainty, unsupported promise, or custom contract request stops selling and triggers respectful termination or human handoff.
 5. **Security and control**
    - No Cartesia API key is embedded in source, WebView storage, logs, or docs.
-   - Calling remains human-started in OpenCloser; this change does not introduce autonomous outbound.
+   - Calling remains human-started through OpenCloser's existing Phone Link/audio-routing path; this change does not introduce autonomous outbound or claim a native power dialer.
 
 ## Acceptance criteria
 
